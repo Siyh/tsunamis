@@ -12,15 +12,11 @@ class TabGeneral(qw.QWidget, WidgetMethods):
         
         layout = qw.QVBoxLayout()
         
-        self.pushButton1 = qw.QPushButton("PyQt5 button")
         
-        
-        
-        label_widget = qw.QLabel('label')
+        label_widget = qw.QLabel('No yet implemented')
         
         hbox = qw.QHBoxLayout()
         hbox.addWidget(label_widget)
-        hbox.addWidget(self.pushButton1)
         
         layout.addLayout(hbox)
         

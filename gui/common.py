@@ -87,9 +87,11 @@ class WidgetMethods:
                 widget.setChecked(value)
             elif isinstance(value, int):
                 widget = qw.QSpinBox()
+                widget.setRange(0, 2147483647)
                 widget.setValue(value)
             elif isinstance(value, float):
                 widget = qw.QDoubleSpinBox()
+                widget.setRange(0, 1E10)
                 widget.setValue(value)
             elif isinstance(value, (dict, list)):                
                 widget = create_combo(value)

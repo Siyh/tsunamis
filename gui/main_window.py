@@ -35,8 +35,8 @@ class TsunamiWindow(qw.QMainWindow):
         #======================================================================
         self.menu_bar = self.menuBar()
         file_menu = self.menu_bar.addMenu('File')
-        # open_sectors = file_menu.addAction('Open Stereonet Sectors')
-        # open_sectors.triggered.connect(self.stereonet.load_sectors)
+        load_configurations = file_menu.addAction('Load configurations')
+        load_configurations.triggered.connect(self.load_configurations)
 
         # Allow the GUI to be quit when run from Spyder
         debugging = self.menu_bar.addMenu('Debugging')
@@ -63,8 +63,6 @@ class TsunamiWindow(qw.QMainWindow):
         self.statusBar = qw.QStatusBar()
         self.setStatusBar(self.statusBar)
         
-        # Make a central widget to hold everything
-        centralWidget = qw.QWidget(self)  
         self.setCentralWidget(self.tabs)   
              
         
@@ -83,12 +81,15 @@ class TsunamiWindow(qw.QMainWindow):
     def load_data(self, path):
         pass
     
+    def load_configurations(self):
+        pass
+    
     
     def closeEvent(self, event):
         # Save the window config
         self.settings.setValue('geometry', self.saveGeometry())
         print('Tsunami window closed')
-        
+        qw.QApplication.quit()        
 
 
 if __name__ == '__main__':
