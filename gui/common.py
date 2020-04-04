@@ -25,8 +25,8 @@ def label_to_attribute(label):
 
 def create_combo(content):
     """
-    Creates a combo box from a dictionary of keys and values, or a list of 
-    values which are used as the keys with incrementing intefers as the values
+    Creates a combo box from either a dictionary of keys and values, or a list of 
+    values which are used as the keys with incrementing integers as the values
     """
     if isinstance(content, list):
         content = {k:i + 1 for i, k in enumerate(content)}
@@ -40,19 +40,47 @@ def create_combo(content):
 
 class WidgetMethods:
     
-    def button_list(self):
+    def create_input_group(self, title):
         """
         Creates a vertical list upon which to place buttons and labelled widgets.
         """
-        self._button_list = qw.QVBoxLayout()
-        return self._button_list
+        gb = qw.QGroupBox(title)
+        self._current_input_group = qw.QVBoxLayout()
+        gb.setLayout(self._current_input_group)        
+        self.config_input_layout.addWidget(gb)
+        return self._current_input_group
     
     
-    def add_input(self, label, model_varb_name, value, widget=None, default=None):    
+    def add_input(self, label, model_varb_name, value, widget=None, default=None):  
         """
-        Labels a widget and adds it to the vertical list
+        Labels a widget and adds it to the input group. The widget type
+        depends on the value used unless a widget is specified. 
+
+        Parameters
+        ----------
+        label : TYPE str
+            label attached to the input in the GUI.
+        model_varb_name : str
+            name of the variable as used by the model.
+        value : TYPE 
+            starting value for the input. 
+        widget : TYPE pyqt widget, optional
+            widget to attach the label to. The default is None.
+        default : TYPE, optional
+            Only necessary if . The default is None.
+
+        Raises
+        ------
+        Exception
+            If the input type is not recognised.
+
+        Returns
+        -------
+        None.
 
         """
+
+        #Create a widget based on the value type
         if widget is None:            
             if isinstance(value, bool):
                 widget = qw.QCheckBox()
@@ -73,14 +101,15 @@ class WidgetMethods:
             else:
                 raise Exception('Input widget type not recognised') 
                 
-        
+        # Remember the widget acoording the model variable name, so the values
+        # can be looked up when the model inputs are output
         self.parameters[model_varb_name] = widget
         
+        # Put a label next to the widget and add them to the input list
         hbox = qw.QHBoxLayout()
         hbox.addWidget(qw.QLabel(label))
-        hbox.addWidget(widget)
-        
-        self._button_list.addLayout(hbox)
+        hbox.addWidget(widget)        
+        self._current_input_group.addLayout(hbox)
         
         
     def add_button(self, label, function):
@@ -90,7 +119,7 @@ class WidgetMethods:
         button = qw.QPushButton(label)
         button.clicked.connect(function)
         setattr(self, label.replace(' ', '_'), button)
-        self._button_list.addWidget(button)
+        self._current_input_group.addWidget(button)
         
     
 

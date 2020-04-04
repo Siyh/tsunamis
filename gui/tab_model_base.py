@@ -4,7 +4,7 @@
 from PyQt5 import QtWidgets as qw
 
 from mayavi_widget import MayaviQWidget
-from common import WidgetMethods, create_combo
+from common import WidgetMethods
 
 
 class TabModelBase(qw.QSplitter, WidgetMethods):
@@ -15,7 +15,15 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.parameters = {}
         
         # Make all the components
-        self.buttons = qw.QWidget()
+        config_input_widget = qw.QWidget()
+        self.config_input_layout = qw.QVBoxLayout()
+        config_input_widget.setLayout(self.config_input_layout)
+        
+        self.config_input_scroller = qw.QScrollArea()
+        self.config_input_scroller.setWidgetResizable(True)
+        self.config_input_scroller.setWidget(config_input_widget)
+        self.config_input_scroller.setMinimumWidth(400)
+        
         self.viewer = qw.QWidget()
         self.plot = MayaviQWidget()
         self.timestepper = qw.QWidget()
@@ -26,21 +34,23 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         viewersplit.addWidget(self.timestepper)
         self.viewer.setLayout(viewersplit)
         
-        self.addWidget(self.buttons)
+        self.addWidget(self.config_input_scroller)
         self.addWidget(self.viewer)   
         
+        
+        #=====================================================================
         # Setup inputs
-        self.buttons.setLayout(self.button_list())
+        #=====================================================================
         
         #TODO set tooltips using .setToolTip
-        
-        self.add_input('Model run title', 'TITLE', 'test')
-        self.add_button('Set depth fle', self.load_depth_clicked)
-        self.add_button('Set results folder', self.set_results_clicked)
-        
+        self.create_input_group('General')        
+        self.add_button('Set depth file', self.load_depth_clicked)
+        self.add_button('Set results folder', self.set_results_clicked)        
         self.add_input('Processor number X', 'PX', 2)
         self.add_input('Processor number Y', 'PY', 2)
         
+        self.create_input_group('Run setup')
+        self.add_input('Model run title', 'TITLE', 'test')
         steps = qw.QSpinBox()
         steps.setSingleStep(1000)
         self.add_input('Simulation steps', 'SIM_STEPS', 1000000, steps)        
@@ -49,15 +59,14 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.add_input('Output time start', 'PLOT_START', 0.0)
         self.add_input('Output interval', 'PLOT_INTV', 20.0)
         self.add_input('Screen output interval', 'SCREEN_INTV', 10.0)
-        
-        self.add_input('Grid size X', 'DX', 500.0)
-        self.add_input('Grid size Y', 'DY', 500.0)
-        
         self.add_input('Initial timestep size', 'DT_INI', 5.0)
         self.add_input('Minimium timestep', 'DT_MIN', 0.01)
         self.add_input('Maximum timestep', 'DT_MAX', 10.0)
         
         
+        self.create_input_group('Bathymetry')
+        self.add_input('Grid size X', 'DX', 500.0)
+        self.add_input('Grid size Y', 'DY', 500.0)
 
         self.add_input('Bathymetry grid type', 'DEPTH_TYPE',
                        {'Cell centred':'CELL_CENTER',
@@ -68,11 +77,6 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
 
 
-        
-        
-        
-        
-        
         
     def load_depth_clicked(self):
         pass
