@@ -3,6 +3,7 @@
 
 from PyQt5 import QtWidgets as qw
 from common import WidgetMethods
+from bokeh_widget import BokehMapQWidget
 
 
 
@@ -10,19 +11,26 @@ class TabGeneral(qw.QWidget, WidgetMethods):
     def __init__(self, parent):
         super(qw.QWidget, self).__init__(parent)
         
-        layout = qw.QVBoxLayout()
+        map_view = BokehMapQWidget()        
+        map_box = qw.QVBoxLayout()
+        map_box.addWidget(map_view)
+        map_widget = qw.QWidget()
+        map_widget.setLayout(map_box)
+
+        
+        button_widget = qw.QWidget()
+        button = qw.QLabel('Buttons')        
+        button_box = qw.QVBoxLayout()
+        button_box.addWidget(button)                
+        button_widget.setLayout(button_box)
         
         
-        label_widget = qw.QLabel('No yet implemented')
-        
-        hbox = qw.QHBoxLayout()
-        hbox.addWidget(label_widget)
-        
-        layout.addLayout(hbox)
-        
-        
-        self.setLayout(layout)
-        
+        splitter = qw.QSplitter()
+        splitter.addWidget(button_widget)
+        splitter.addWidget(map_widget)
+        top_layout = qw.QVBoxLayout()
+        top_layout.addWidget(splitter)
+        self.setLayout(top_layout)
         
         
         

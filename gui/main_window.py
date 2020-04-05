@@ -20,7 +20,7 @@ class TsunamiWindow(qw.QMainWindow):
         self.setWindowIcon(QtGui.QIcon('great_wave_tip.png'))
         
         # Restore the window position
-        self.settings = QtCore.QSettings('INeedACompanyName', 'BoreholeViewer')
+        self.settings = QtCore.QSettings('INeedACompanyName', 'TsunamiGUI')
         geometry = self.settings.value('geometry', '')
         if geometry:
             self.restoreGeometry(geometry)
