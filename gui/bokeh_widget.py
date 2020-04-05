@@ -50,11 +50,15 @@ class BokehMapQWidget(QtWebEngineWidgets.QWebEngineView):
     def __init__(self, parent=None):
         QtWebEngineWidgets.QWebEngineView.__init__(self, parent)
         
-        p = figure(tools='wheel_zoom,pan',
+        p = figure(tools='wheel_zoom,pan,box_zoom,reset',
+                   active_scroll='wheel_zoom',
                    lod_threshold=None,
                    #TODO make the bounds work
+                   x_axis_label='Longitude',
+                   y_axis_label='Latitude',
                    x_range=Range1d(start=xmin, end=xmax, bounds=None),
-                   y_range=Range1d(start=ymin, end=ymax, bounds=None))
+                   y_range=Range1d(start=ymin, end=ymax, bounds=None),
+                   sizing_mode='stretch_both')
         
         p.toolbar_location = 'above'
 
@@ -64,7 +68,7 @@ class BokehMapQWidget(QtWebEngineWidgets.QWebEngineView):
         
         self.setHtml(file_html(p, CDN, 'GEBCO map plot'))
         
-        
+ 
         
         
 if __name__ == '__main__':

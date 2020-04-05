@@ -16,8 +16,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         # Make all the components
         config_input_widget = qw.QWidget()
-        self.config_input_layout = qw.QVBoxLayout()
-        config_input_widget.setLayout(self.config_input_layout)
+        self.input_layout = qw.QVBoxLayout()
+        config_input_widget.setLayout(self.input_layout)
         
         self.config_input_scroller = qw.QScrollArea()
         self.config_input_scroller.setWidgetResizable(True)

@@ -47,7 +47,7 @@ class WidgetMethods:
         gb = qw.QGroupBox(title)
         self._current_input_group = qw.QVBoxLayout()
         gb.setLayout(self._current_input_group)        
-        self.config_input_layout.addWidget(gb)
+        self.input_layout.addWidget(gb)
         return self._current_input_group
     
     
