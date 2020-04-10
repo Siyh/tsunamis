@@ -1,11 +1,10 @@
 # Main window for Tsunami GUI
 # Simon Libby 
 
-import sys
 from PyQt5 import QtWidgets as qw
 from PyQt5 import QtGui, QtCore
 
-from tab_general import TabGeneral
+from tab_map import TabMap
 from tab_nhwave import TabNHWAVE
 from tab_funwave import TabFUNWAVE
 
@@ -51,12 +50,12 @@ class TsunamiWindow(qw.QMainWindow):
         
         # Create the tabs
         self.tabs = qw.QTabWidget()
-        self.tab_general = TabGeneral(self)
+        self.tab_map = TabMap(self)
         self.tab_nhwave = TabNHWAVE(self)
         self.tab_funwave = TabFUNWAVE(self)
         
         # Arrange them
-        self.tabs.addTab(self.tab_general, 'General')
+        self.tabs.addTab(self.tab_map, 'Locations')
         self.tabs.addTab(self.tab_nhwave, 'NHWAVE')
         self.tabs.addTab(self.tab_funwave, 'FUNWAVE')
         

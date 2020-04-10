@@ -2,7 +2,7 @@
 # Simon Libby 2020
 
 from tab_model_base import TabModelBase
-from Tsunamis.models.funwave import config as funwave_config
+from tsunamis.models.funwave import config as funwave_config
 
 
 class TabFUNWAVE(TabModelBase):
