@@ -8,9 +8,11 @@ from tsunamis.models.funwave import config as funwave_config
 class TabFUNWAVE(TabModelBase):
     
     def __init__(self, parent):
+        self.model = funwave_config()
+        
         super().__init__(parent)
         
-        self.model = funwave_config()
+        
         
         
         
