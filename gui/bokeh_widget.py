@@ -2,7 +2,7 @@
 # Simon Libby 2020
 
 from bokeh.plotting import figure
-from bokeh.embed import file_html
+from bokeh.embed import file_html, server_session
 from bokeh.resources import CDN
 from bokeh.models import BBoxTileSource, Range1d
 
@@ -26,47 +26,46 @@ except ImportError:
     print('Reimporting web engine')
     app = webengine_hack()
     from PyQt5 import QtWebEngineWidgets
-    
 
-# Setup the GEBCO WMS url
-crs = 'EPSG:4326'
-xmin = -180
-ymin = -90
-xmax = 180
-ymax = 90
-width = 1024
-height = 1024
-url1 = ('https://www.gebco.net/data_and_products/gebco_web_services/'
-       '2019/mapserv?request=getmap&service=wms&'
-       'BBOX={YMIN},{XMIN},{YMAX},{XMAX}&')
-url2 = ('crs={crs}&format=image/jpeg&layers=gebco_2019_grid&'
-       'width={width}&height={height}&version=1.3.0')
-url_set = url1 + url2.format(crs=crs, width=width, height=height)
+from PyQt5.QtCore import QUrl
 
+
+from common import build_wms_url
 
 
 class BokehMapQWidget(QtWebEngineWidgets.QWebEngineView):
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None,
+                 xmin=-180, xmax=180, ymin=-90, ymax=90):
+        
         QtWebEngineWidgets.QWebEngineView.__init__(self, parent)
         
-        p = figure(tools='wheel_zoom,pan,box_zoom,reset',
-                   active_scroll='wheel_zoom',
-                   lod_threshold=None,
-                   #TODO make the bounds work
-                   x_axis_label='Longitude',
-                   y_axis_label='Latitude',
-                   x_range=Range1d(start=xmin, end=xmax, bounds=None),
-                   y_range=Range1d(start=ymin, end=ymax, bounds=None),
-                   sizing_mode='stretch_both')
+        self.figure = figure(tools='wheel_zoom,pan,box_zoom,reset',
+                             active_scroll='wheel_zoom',
+                             lod_threshold=None,
+                             #TODO make the bounds work
+                             x_axis_label='Longitude',
+                             y_axis_label='Latitude',
+                             x_range=Range1d(start=xmin, end=xmax, bounds=None),
+                             y_range=Range1d(start=ymin, end=ymax, bounds=None),
+                             sizing_mode='stretch_both')
+        self.figure.toolbar_location = 'above'
         
-        p.toolbar_location = 'above'
-
-        p.add_tile(BBoxTileSource(url=url_set))
-
+        url = build_wms_url()
+        self.figure.add_tile(BBoxTileSource(url=url))  
+        
+        #Need to update the map here to make it take up space
+        self.update()
 
         
-        self.setHtml(file_html(p, CDN, 'GEBCO map plot'))
+        
+    def update(self):
+        self.setHtml(file_html(self.figure, CDN, 'GEBCO map plot'))
+        #print(server_session(self.figure, 1))
+        #self.setUrl(QUrl('http://localhost:5006/'))
+        
+        
+
         
  
         

@@ -2,6 +2,7 @@
 # Simon Libby 2020
 
 from PyQt5 import QtWidgets as qw
+import numpy as np
 
 from tab_model_base import TabModelBase
 from Tsunamis.models.nhwave import config as nhwave_config
@@ -10,9 +11,13 @@ from Tsunamis.models.nhwave import config as nhwave_config
 class TabNHWAVE(TabModelBase):
     
     def __init__(self, parent):
+        self.model = nhwave_config()
+        
         super().__init__(parent)
         
-        self.model = nhwave_config()
+        
+        
+
         
         #=====================================================================
         # Add nhwave specific inputs
@@ -26,16 +31,16 @@ class TabNHWAVE(TabModelBase):
                        {'TVD':'TVD', 'HLPA':'HLPA'},
                        default=1)
         
-        self.create_input_group('Landslides')
+        self.create_input_group('Landslides', self.recalculate_landslide)
         self.add_input('Slide type', 'SlideType',
                        {'rigid':'RIGID_3D', 'deformable':'DEFORMABLE'})
         self.add_input('Thickness', 'SlideT', 30.0)
-        self.add_input('Length', 'SlideL', 1000.0)
-        self.add_input('Width', 'SlideW', 2000.0)
-        self.add_input('Direction', 'SlideAngle', 0.0)
-        self.add_input('Angle', 'SlopeAngle', 10.0)
-        self.add_input('X coordinate', 'SlideX0', 0.0)
-        self.add_input('Y coordinate', 'SlideY0', 0.0)
+        self.add_input('Length', 'SlideL', 200.0)
+        self.add_input('Width', 'SlideW', 500.0)
+        self.add_input('Direction', 'SlideAngle', 270.0)
+        self.add_input('Slope angle', 'SlopeAngle', 10.0)
+        self.add_input('X coordinate', 'SlideX0', 1000.0)
+        self.add_input('Y coordinate', 'SlideY0', 1000.0)
         self.add_input('Max speed?', 'SlideUt', 10)
         self.add_input('Acceleration', 'SlideA0', 0.37)
         self.add_input('Density', 'SlideDens', 2100.0)
@@ -48,6 +53,7 @@ class TabNHWAVE(TabModelBase):
         self.add_input('Use rheology', 'RHEOLOGY_ON', False)
         self.add_input('Yield stress', 'Yield_Stress', 10.0)
         self.add_input('Plastic viscosity', 'Plastic_Visc', 0.0)
+        self.recalculate_landslide()
         
         self.create_input_group('Boundary')
         self.add_input('Period boundary condition X', 'PERIODIC_X', False)
@@ -143,7 +149,48 @@ class TabNHWAVE(TabModelBase):
         self.add_input('max wave height', 'OUT_M', True)
         
         
-
+    def timestep_changed(self):
+        self.recalculate_landslide()          
+        super().timestep_changed()
+        
+        
+    def recalculate_landslide(self):
+        """Function to generate the bathymetry with landslide"""  
+        #TODO add an option for subtractive as well as additive landslides
+        
+        #Rigid landslide 'lumpiness' parameter
+        e = 0.717 
+        
+        alpha0 = np.radians(self.pv('SlideAngle'))
+        cosa0 = np.cos(alpha0)
+        sina0 = np.sin(alpha0)
+        coss0 = np.cos(np.radians(self.pv('SlopeAngle')))   
+        
+        v = 2.0 * np.arccosh(1.0 / e)
+        kb = v / self.pv('SlideL')
+        kw = v / self.pv('SlideW')
+        ut = self.pv('SlideUt')
+        a0 = self.pv('SlideA0')
+        #Time to terminal velocity        
+        t0 = ut / a0
+        #Distance of landslide travel before terminal velocity
+        s0 = ut ** 2 / a0
+        
+        st = s0 * np.log(np.cosh(self.timestep / t0)) * coss0
+        lsx = self.pv('SlideX0') + st * cosa0 + self.xs[0, 0]
+        lsy = self.pv('SlideY0') + st * sina0 + self.ys[0, 0]
+        
+        xsmlsx = self.xs - lsx
+        ysmlsy = self.ys - lsy
+        xt = xsmlsx * cosa0 + ysmlsy * sina0
+        yt = -xsmlsx * sina0 + ysmlsy * cosa0
+        zt = self.pv('SlideT') / (1 - e) * (1 / np.cosh(kb * xt) / np.cosh(kw * yt) - e)
+        blob = zt.clip(min=0)
+        vol_est = np.sum(blob * self.pv('DX') * self.pv('DY')) / 1E9
+        self.vol_est = '%i' % vol_est if vol_est > 10 else '%.1f' % vol_est
+        self.bathymetry = self.zs + blob
+        self.plot.draw_bathymetry()
+        
 
 
 

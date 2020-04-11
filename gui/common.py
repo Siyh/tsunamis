@@ -40,34 +40,41 @@ def create_combo(content):
 
 class WidgetMethods:
     
-    def create_input_group(self, title):
+    def create_input_group(self, title, function=None):
         """
         Creates a vertical list upon which to place buttons and labelled widgets.
+        If a function is given, it is called whenever one of the input group changes.
         """
         gb = qw.QGroupBox(title)
         self._current_input_group = qw.QVBoxLayout()
         gb.setLayout(self._current_input_group)        
         self.input_layout.addWidget(gb)
+        self._current_input_group_function = function
         return self._current_input_group
     
     
-    def add_input(self, label, model_varb_name, value, widget=None, default=None):  
+    def add_input(self, label, model_varb_name, value,
+                  widget=None, default=None, function=None):  
         """
         Labels a widget and adds it to the input group. The widget type
         depends on the value used unless a widget is specified. 
 
         Parameters
         ----------
-        label : TYPE str
+        label : str
             label attached to the input in the GUI.
         model_varb_name : str
             name of the variable as used by the model.
-        value : TYPE 
-            starting value for the input. 
-        widget : TYPE pyqt widget, optional
+        value : int/float/str/dict 
+            value for the input. 
+        widget : pyqt widget, optional
             widget to attach the label to. The default is None.
-        default : TYPE, optional
-            Only necessary if . The default is None.
+        default :  optional
+            Only used if the value was a dict. The default is None.
+        function : function, optional
+            function to call when the value of the widget changes. If not
+            provided, uses the one specified for the input group if that
+            was provided.
 
         Raises
         ------
@@ -113,6 +120,15 @@ class WidgetMethods:
         hbox.addWidget(widget)        
         self._current_input_group.addLayout(hbox)
         
+        # Link it to a function if desired
+        if hasattr(widget, 'valueChanged'):
+            if function is None:
+                if self._current_input_group_function is not None:
+                    widget.valueChanged.connect(self._current_input_group_function)
+            else:
+                widget.valueChanged.connect(function)
+                function()
+        
         
     def add_button(self, label, function):
         """
@@ -124,7 +140,22 @@ class WidgetMethods:
         self._current_input_group.addWidget(button)
         
     
-
+def build_wms_url(epsg='4326',
+                  xmin='{XMIN}', xmax='{XMAX}',
+                  ymin='{YMIN}', ymax='{YMAX}',
+                  width=1024, height=1024,
+                  data_format='image/jpeg',
+                  layer='gebco_2019_grid'):
+    
+    # Setup the GEBCO WMS url
+    url = ('https://www.gebco.net/data_and_products/gebco_web_services/'
+           '2019/mapserv?request=getmap&service=wms&'
+           'BBOX={ymin},{xmin},{ymax},{xmax}&crs=EPSG:{epsg}'
+           '&format={data_format}&layers={layer}&'
+           'width={width}&height={height}&version=1.3.0')
+    return url.format(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
+                      epsg=epsg, width=width, height=height,
+                      data_format=data_format, layer=layer)
         
     
         
