@@ -61,9 +61,33 @@ class TabGeneral(qw.QWidget, WidgetMethods):
         self.add_input('Y max', 'fun_ymax', 20.0)
 
         
-    def draw_box(xmin, xmax, ymin, ymax, c):
-        # Get a list of the points round the box 
-        pass
+    def draw_box(self,xmin, xmax, ymin, ymax, c):
+        """
+        Draw a box using the xmin, xmax, ymin and ymax coordinates
+        
+        Parameters
+        ------------
+        xmin : X coordinate of bottom left corner
+        ymin : Y coordinate of bottom left corner
+        xmax : X coordinate of right top corner
+        ymax : Y coordinate of right top corner
+        c : ?
+        
+        Returns
+        ------------
+        boxCoords : two row matrix, first row contains the x coordinates of 
+        the box going from the bottom left corner anti-clockwise. second row is
+        the Y coordinates.
+        """
+        sampPerSide = 100
+        xCoord = np.linspace(xmin,xmax,sampPerSide)
+        yCoord = np.linspace(ymin,ymax,sampPerSide)
+        boxCoords = np.zeros([sampPerSide*4-4,2])
+        boxCoords[:,0]=np.concatenate((xCoord,np.repeat(xmax,sampPerSide-2,axis=0),\
+                        np.flipud(xCoord),np.repeat(xmin,sampPerSide-2,axis=0)))
+        boxCoords[:,1]=np.concatenate((np.repeat(ymin,sampPerSide-1,axis=0),yCoord,\
+                        np.repeat(ymax,sampPerSide-2,axis=0),np.flipud(yCoord[1:])),axis=0)
+        return boxCoords
         
         
 if __name__ == '__main__':
