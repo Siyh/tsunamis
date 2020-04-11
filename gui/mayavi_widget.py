@@ -6,6 +6,8 @@
 from traits.api import HasTraits, Instance, on_trait_change
 from traitsui.api import View, Item
 from mayavi.core.ui.api import MayaviScene, MlabSceneModel, SceneEditor
+from mayavi import mlab
+
 
 # First, and before importing any Enthought packages, set the ETS_TOOLKIT
 # environment variable to qt4, to tell Traits that we will use Qt.
@@ -34,9 +36,10 @@ class Visualization(HasTraits):
         # This function is called when the view is opened. We don't
         # populate the scene when the view is not yet open, as some
         # VTK features require a GLContext.
-
-        # We can do normal mlab calls on the embedded scene.
-        self.scene.mlab.test_points3d()
+        
+        # TODO this is causing errors
+        #mlab.orientation_axes(figure=self.scene.mayavi_scene)
+        pass
 
     # the layout of the dialog screated
     view = View(Item('scene', editor=SceneEditor(scene_class=MayaviScene),
@@ -48,13 +51,14 @@ class Visualization(HasTraits):
 ################################################################################
 # The QWidget containing the visualization, this is pure PyQt4 code.
 class MayaviQWidget(QtGui.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent, data_object):
+        
         QtGui.QWidget.__init__(self, parent)
         layout = QtGui.QVBoxLayout(self)
-        layout.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        self.visualization = Visualization()
-
+        self.visualization = Visualization()           
+        self.visualization.draw_bathymetry = self.draw_bathymetry
         # If you want to debug, beware that you need to remove the Qt
         # input hook.
         #QtCore.pyqtRemoveInputHook()
@@ -64,5 +68,56 @@ class MayaviQWidget(QtGui.QWidget):
         # The edit_traits call will generate the widget to embed.
         self.ui = self.visualization.edit_traits(parent=self,
                                                  kind='subpanel').control
+        
+        
+
         layout.addWidget(self.ui)
-        self.ui.setParent(self)
+        self.ui.setParent(self)   
+        
+        # Set up the data links
+        self.figure = self.visualization.scene.mayavi_scene
+        self.data_object = data_object
+        
+        
+        
+        
+   
+        
+    def draw_bathymetry(self):
+        if not self.figure: return
+
+        mlab.clf(figure=self.figure)
+        
+        self.bathymetry = mlab.surf(self.data_object.xs.T,
+                                    self.data_object.ys.T,
+                                    self.data_object.bathymetry.T,
+                                    warp_scale=1,
+                                    colormap='gist_earth',
+                                    figure=self.figure) 
+                
+        self.contours = mlab.contour_surf(self.data_object.xs.T,
+                                          self.data_object.ys.T,
+                                          self.data_object.bathymetry.T,
+                                          contours=[0],
+                                          warp_scale=1,
+                                          color=(0, 0, 0),
+                                          figure=self.figure) 
+                
+        # self.make_scale_bar()
+        
+        #if np.any(depth_data):
+            ###### generates errors
+            #mlab.axes(self.dplot)#, xlabel='X', ylabel='Y', zlabel='Elevation')
+                    
+        # if self.show_waves and self.have_results:
+        #     self.make_wave_plot(self.eta[self.tstep])            
+                                        
+        #     #self.figure.on_mouse_pick(self.picker_callback)
+                   
+        #     if self.show_vectors:
+        #         self.make_vector_plot()
+        
+        
+if __name__ == '__main__':
+    from run_gui import run
+    run()

@@ -49,10 +49,14 @@ class TsunamiWindow(qw.QMainWindow):
         #======================================================================
         
         # Create the tabs
-        self.tabs = qw.QTabWidget()
-        self.tab_map = TabMap(self)
+        self.tabs = qw.QTabWidget(self)        
         self.tab_nhwave = TabNHWAVE(self)
         self.tab_funwave = TabFUNWAVE(self)
+        self.tab_map = TabMap(self)
+        
+        # Show the map tab on the other tabs
+        self.tab_nhwave.tab_map = self.tab_map
+        self.tab_funwave.tab_map = self.tab_map
         
         # Arrange them
         self.tabs.addTab(self.tab_map, 'Locations')
