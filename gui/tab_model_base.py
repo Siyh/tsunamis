@@ -9,14 +9,17 @@ import requests
 from PIL import Image
 
 
-from mayavi_widget import MayaviQWidget
+from mayavi_widget import MayaviQWidget, mlab
 from common import WidgetMethods, build_wms_url
 
 
 class TabModelBase(qw.QSplitter, WidgetMethods):
     
-    def __init__(self, parent):
+    def __init__(self, parent, directory=''):
         super().__init__(parent)
+        
+        self.directory = directory
+        self.results_directory = 'results/'
         
         self.parameters = {}
         
@@ -53,6 +56,29 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         steppersplit.addWidget(self.timestepper)
         plot_controls.setLayout(steppersplit)
         
+        stepper_buttons = qw.QHBoxLayout()
+        stepper_buttons.setAlignment(Qt.AlignRight)
+        plot_buttons.setLayout(stepper_buttons)
+        
+        self.play_pause_button = qw.QPushButton('|>') 
+        next_step = qw.QPushButton('>') 
+        previous_step = qw.QPushButton('<') 
+        restart = qw.QPushButton('<<') 
+        
+        self.play_pause_button.clicked.connect(self.play_pause_clicked)
+        next_step.clicked.connect(self.next_timestep)
+        previous_step.clicked.connect(self.previous_timestep)
+        restart.clicked.connect(self.restart_timestepper)
+        
+        stepper_buttons.addWidget(restart)
+        stepper_buttons.addWidget(previous_step)
+        stepper_buttons.addWidget(next_step)
+        stepper_buttons.addWidget(self.play_pause_button)      
+        
+        
+        
+        
+        self.playing = False
         
         #=====================================================================
         # Setup inputs
@@ -62,6 +88,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.create_input_group('General')        
         self.add_button('Run ' + self.model.model, self.run_model_clicked)  
         
+        self.add_button('Set model folder', self.set_directory) 
         self.add_button('Set results folder', self.set_results_clicked)        
         self.add_input('Processor number X', 'PX', 2)
         self.add_input('Processor number Y', 'PY', 2)
@@ -79,6 +106,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.add_input('Initial timestep size', 'DT_INI', 2.0)
         self.add_input('Minimium timestep', 'DT_MIN', 0.01)
         self.add_input('Maximum timestep', 'DT_MAX', 10.0)
+        # TODO implement hotstarting
+        self.add_input('Hotstart', 'HOTSTART', False)
         
         
         self.create_input_group('Bathymetry')
@@ -97,10 +126,6 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                         'Cell vertex aligned':'CELL_GRID'})        
         self.add_input('Analytical bathymetry', 'ANA_BATHY', False)
         self.add_input('DepConst', 'DepConst', 0.3)        
-        
-        
-       
-        
         
         # Make dummy x and y grids
         dx = self.parameters['DX'].value()
@@ -135,6 +160,44 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         pass
     # TODO update wave output
         
+    def play_pause_clicked(self):
+        #TODO make this initiate the animate
+        if self.playing:
+            self.playing = False
+            self.play_pause_button.setText('|>')
+            
+            # Make it stop playings
+            self.animator.timer.Stop()
+        else:
+            self.playing = True
+            self.play_pause_button.setText('||')
+            
+            # Make it play
+            if hasattr(self, 'animator'):
+                self.animator.timer.Start(100)
+            else:
+                self.animator = self.animate()
+                
+    @mlab.animate(delay=100, ui=False)    
+    def animate(self):
+        #So that the animation loop stops when the window is closed
+        while self.playing:
+            if self.timestep == self.pv('TOTAL_TIME'):
+                # Go back to the start if it reached the end
+                self.restart_timestepper()
+            else:
+                self.next_timestep()
+            yield
+    
+    def next_timestep(self):
+        self.timestepper.setValue(self.timestep + self.timestepper.singleStep())
+        
+    def previous_timestep(self):
+        self.timestepper.setValue(self.timestep - self.timestepper.singleStep())
+        
+    def restart_timestepper(self):
+        self.timestepper.setValue(0)
+
         
     def download_bathymetry(self):
         # Get the bathmetry limits from the maps tab
@@ -187,13 +250,31 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # TODO set cell size according to file
         #self.parameters['DX'].setValue()
         
-        self.plot.render_plot(self.zs)
+        self.plot.draw_bathymetry(self.zs)
         
     
     
     def set_results_clicked(self):
-        pass
+        if self.directory:
+            directory = self.directory
+        else:
+            directory = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        
+        # TODO make this relative to self.directory
+        self.results_directory = qw.QFileDialog.getExistingDirectory(self,
+                                                   'Select {} results directory'.format(self.model.model),
+                                                   directory)   
     
+    def set_directory(self):
+        if self.directory:
+            directory = self.directory
+        else:
+            directory = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        
+        self.directory = qw.QFileDialog.getExistingDirectory(self,
+                                                             'Select {} directory'.format(self.model.model),
+                                                             directory)   
+ 
     
     def load_arcascii(self, path):
         with open(path) as f:
@@ -239,11 +320,15 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         return self.parameters[parameter].value()
     
     def run_model_clicked(self):
-        for k, w in self.paramters.items():
+        for k, w in self.parameters.items():
             self.model.parameters[k] = w.value()
+            
+        self.model.parameters['RESULT_FOLDER'] = self.results_directory
             
         self.model.depth = -self.zs
             
+        self.model.output_directory = self.directory
+        
         self.model.write_config()
         
         self.model.run()

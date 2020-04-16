@@ -50,8 +50,8 @@ class TsunamiWindow(qw.QMainWindow):
         
         # Create the tabs
         self.tabs = qw.QTabWidget(self)        
-        self.tab_nhwave = TabNHWAVE(self)
-        self.tab_funwave = TabFUNWAVE(self)
+        self.tab_nhwave = TabNHWAVE(self, initial_directory)
+        self.tab_funwave = TabFUNWAVE(self, initial_directory)
         self.tab_map = TabMap(self)
         
         # Show the map tab on the other tabs
@@ -76,7 +76,8 @@ class TsunamiWindow(qw.QMainWindow):
         
         # Load in the initial data if there is any
         if initial_directory:        
-            self.load_data(initial_directory)            
+            self.load_data(initial_directory)  
+            # TODO
         else:
             pass
        

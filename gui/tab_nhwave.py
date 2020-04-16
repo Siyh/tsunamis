@@ -10,10 +10,10 @@ from Tsunamis.models.nhwave import config as nhwave_config
 
 class TabNHWAVE(TabModelBase):
     
-    def __init__(self, parent):
+    def __init__(self, parent, initial_directory):
         self.model = nhwave_config()
         
-        super().__init__(parent)
+        super().__init__(parent, initial_directory)
         
         
         

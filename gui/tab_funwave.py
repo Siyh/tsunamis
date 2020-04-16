@@ -7,10 +7,10 @@ from tsunamis.models.funwave import config as funwave_config
 
 class TabFUNWAVE(TabModelBase):
     
-    def __init__(self, parent):
+    def __init__(self, parent, initial_directory):
         self.model = funwave_config()
         
-        super().__init__(parent)
+        super().__init__(parent, initial_directory)
         
         
         

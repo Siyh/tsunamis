@@ -87,11 +87,14 @@ class WidgetMethods:
 
         """
 
-        #Create a widget based on the value type
+        # Create a widget based on the value type
+        # Map the getting and setting of values to a common method
         if widget is None:            
             if isinstance(value, bool):
                 widget = qw.QCheckBox()
                 widget.setChecked(value)
+                widget.setValue = widget.setChecked
+                widget.value = widget.isChecked
             elif isinstance(value, int):
                 widget = qw.QSpinBox()
                 widget.setRange(0, 2147483647)
@@ -102,13 +105,17 @@ class WidgetMethods:
                 widget.setValue(value)
             elif isinstance(value, (dict, list)):                
                 widget = create_combo(value)
+                widget.value = widget.currentIndex
+                widget.setValue = widget.setCurrentIndex
                 if default is not None:
                     widget.setCurrentIndex(default)
             elif isinstance(value, str):
-                widget = qw.QLineEdit()
+                widget = qw.QLineEdit()                
                 widget.setText(value)
+                widget.setValue = widget.setText
+                widget.value = widget.text
             else:
-                raise Exception('Input widget type not recognised') 
+                raise Exception('Input widget type not recognised')
                 
         # Remember the widget acoording the model variable name, so the values
         # can be looked up when the model inputs are output

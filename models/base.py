@@ -106,8 +106,8 @@ class model:
         
         print('Writing {} inputs...'.format(self.model))
         
-        self.write_inputs()
-        self.write_depth()               
+        self.write_inputs(output_directory)
+        self.write_depth(output_directory)               
         
         self.target_executable_path = os.path.join(output_directory, self.executable_name)
         copyfile(self.source_executable_path, self.target_executable_path)
@@ -139,8 +139,7 @@ class model:
         np.savetxt(path, self.depth, fmt='%5.1f')
         
         
-    def run(self,
-            output_directory=''):
+    def run(self, output_directory=''):
         """Run the simulation with the given inputs"""
         
         if not output_directory: output_directory = self.output_directory        
@@ -152,9 +151,9 @@ class model:
         # If this is running on Windows change the command appropriately
         if os.name == 'nt':
             command = 'wsl.exe ' + path_to_wsl(command)
-            input_path = self.output_directory.replace('\\', '/')
+            input_path = output_directory.replace('\\', '/')
         else:
-            input_path = self.output_directory
+            input_path = output_directory
          
         print(self.model + ' initiated with command:')
         print(command + '\nin:\n' + input_path)
