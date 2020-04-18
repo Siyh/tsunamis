@@ -7,6 +7,7 @@ import numpy as np
 import os
 import requests
 from PIL import Image
+import datetime
 
 
 from mayavi_widget import MayaviQWidget, mlab
@@ -95,9 +96,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         self.create_input_group('Run setup')
         self.add_input('Model run title', 'TITLE', 'test')
-        steps = qw.QSpinBox()
-        steps.setSingleStep(1000)
-        self.add_input('Simulation steps', 'SIM_STEPS', 100000, steps)        
+        step_widget = self.add_input('Simulation steps', 'SIM_STEPS', 1000)   
+        step_widget.setSingleStep(100)
         #TODO make this accept different units of time, not just seconds
         self.add_input('Total time', 'TOTAL_TIME', 300.0, function=self.total_time_changed)
         self.add_input('Output time start', 'PLOT_START', 0.0, function=self.plot_start_changed)
@@ -157,8 +157,10 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         return self.timestepper.value()
     
     def timestep_changed(self):
-        pass
-    # TODO update wave output
+        time = datetime.timedelta(seconds=self.timestep)
+        self.plot.timestep_label.input = str(time)
+        
+        # TODO update wave output
         
     def play_pause_clicked(self):
         #TODO make this initiate the animate
@@ -312,6 +314,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.map_box.data.update(new_box)
         #TODO do this without rerendering the map
         self.tab_map.map.update()
+        
 
     def pv(self, parameter):
         """
@@ -319,20 +322,39 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         """
         return self.parameters[parameter].value()
     
+    
     def run_model_clicked(self):
+        # Set parameters
         for k, w in self.parameters.items():
-            self.model.parameters[k] = w.value()
-            
-        self.model.parameters['RESULT_FOLDER'] = self.results_directory
-            
-        self.model.depth = -self.zs
-            
+            self.model.parameters[k] = w.value()            
+        self.model.parameters['RESULT_FOLDER'] = self.results_directory            
+        self.model.depth = -self.zs            
         self.model.output_directory = self.directory
         
+        # Output them
         self.model.write_config()
         
-        self.model.run()
+        # And run
+        run = self.model.run()
         
+        if run: self.read_results()
+        
+        
+    # TODO probably makes sense to move this to the model class
+    def read_results(self):
+        # TODO
+        #need to figure out the timesteps, make a dictionary to hold the grids
+        # of values for each one. When they are loaded in, they can just
+        # replace the dictionary values
+        file_list = sorted(glob(self.results_directory + 'eta_*'),
+                               key=lambda name: int(name[-5:]))
+        
+        
+        
+        data = [np.zeros_like(self.depth)]
+        for i, path in enumerate(file_list):
+            print('\rLoading output {} of {}'.format(i + 1, len(file_list)), end='')
+            data.append(np.loadtxt(path))
         
 if __name__ == '__main__':
     from run_gui import run

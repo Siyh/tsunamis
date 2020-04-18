@@ -5,7 +5,7 @@ from PyQt5 import QtWidgets as qw
 import numpy as np
 
 from tab_model_base import TabModelBase
-from Tsunamis.models.nhwave import config as nhwave_config
+from tsunamis.models.nhwave import config as nhwave_config
 
 
 class TabNHWAVE(TabModelBase):
@@ -27,9 +27,6 @@ class TabNHWAVE(TabModelBase):
         self.add_input('Vertical grid distribution', 'IVGRD',
                        ['uniform', 'exponential']) 
         self.add_input('GRD_R', 'GRD_R', 1.1)
-        self.add_input('Vertical grid distribution', 'IVGRD',
-                       {'TVD':'TVD', 'HLPA':'HLPA'},
-                       default=1)
         
         self.create_input_group('Landslides', self.recalculate_landslide)
         self.add_input('Slide type', 'SlideType',
@@ -41,7 +38,7 @@ class TabNHWAVE(TabModelBase):
         self.add_input('Slope angle', 'SlopeAngle', 10.0)
         self.add_input('X coordinate', 'SlideX0', 1000.0)
         self.add_input('Y coordinate', 'SlideY0', 1000.0)
-        self.add_input('Max speed?', 'SlideUt', 10)
+        self.add_input('Max speed?', 'SlideUt', 10.0)
         self.add_input('Acceleration', 'SlideA0', 0.37)
         self.add_input('Density', 'SlideDens', 2100.0)
         self.add_input('Viscosity', 'SlideVisc', 0.00001)
@@ -57,7 +54,7 @@ class TabNHWAVE(TabModelBase):
         
         self.create_input_group('Boundary')
         self.add_input('Period boundary condition X', 'PERIODIC_X', False)
-        self.add_input('Period boundary condition Y', 'PERIODIC_y', False)        
+        self.add_input('Period boundary condition Y', 'PERIODIC_Y', False)        
         self.add_input('External forcing', 'EXTERNAL_FORCING', False)
         self.add_input('Pgrad0', 'Pgrad0', 9.81e-4)        
         for d in ['X', 'Y', 'Z']:
@@ -87,14 +84,17 @@ class TabNHWAVE(TabModelBase):
         self.create_input_group('To sort')
         self.add_input('INITIAL_EUVW', 'INITIAL_EUVW', False)
         self.add_input('INITIAL_SALI', 'INITIAL_SALI', False)
-        self.add_input('Latitude', 'slat', 54)
+        self.add_input('Latitude', 'slat', 54.0)
         self.add_input('Barotropic', 'BAROTROPIC', True)
         self.add_input('Non-hydrostatic', 'NON_HYDRO', True)
         self.add_input('Cournat number', 'CFL', 0.5)
         self.add_input('Fourde cap', 'FROUDE_CAP', 0.5)
         self.add_input('Time to ramp up simulation', 'TRAMP', 0.0)
         for o in ['HIGH_ORDER', 'TIME_ORDER']:            
-            self.add_input(o, o, {'first':'FIRST', 'second':'SECOND'})            
+            self.add_input(o, o, {'first':'FIRST', 'second':'SECOND'}) 
+        self.add_input('Convection', 'CONVECTION',
+                       {'TVD':'TVD', 'HLPA':'HLPA'},
+                       default='HLPA')        
         self.add_input('Minimum depth for wetting-drying', 'MinDep', 0.1)
         self.add_input('HLLC', 'HLLC', False)        
         self.add_input('Bottom roughness method', 'Ibot',
@@ -123,10 +123,21 @@ class TabNHWAVE(TabModelBase):
                         'Successive Overrelaxation (SOR) GMRES'],
                        default=1)
         self.add_input('Maximum iterations', 'ITMAX', 1000)
-        self.add_input('Tolerance', 'TOL', 1E-8)        
+        self.add_input('Tolerance', 'TOL', 1E-8) 
         
-        #TODO implement sediment, wavemaker, vegetation           
+        
+        self.create_input_group('Wavemaker')
+        self.add_input('Wave type', 'WAVEMAKER', {'None':'NONE'})
+        
+        #TODO implement sediment, wavemaker, vegetation     
         #TODO implement probes, hotstart parameters, coupling
+        
+        self.create_input_group('Wave average control')
+        self.add_input('Enabled', 'WAVE_AVERAGE_ON ', False)
+        self.add_input('Start', 'WAVE_AVERAGE_START', 200.0)
+        self.add_input('End', 'WAVE_AVERAGE_END', 1800.0)
+        self.add_input('ID', 'WaveheightID', 2)       
+        
         
         self.create_input_group('Outputs')
         self.add_input('water depth', 'OUT_H', True)
@@ -147,6 +158,10 @@ class TabNHWAVE(TabModelBase):
         self.add_input('salinity', 'OUT_I', False)
         self.add_input('varying bathymetry', 'OUT_Z', False)
         self.add_input('max wave height', 'OUT_M', True)
+        
+        # Implement GUI version of probe outputs
+        self.add_input('number of probes', 'NSTAT', 0)
+        self.add_input('probe start time', 'PLOT_INTV_STAT', 10.0)
         
         
     def timestep_changed(self):

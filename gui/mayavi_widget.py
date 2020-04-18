@@ -7,6 +7,7 @@ from traits.api import HasTraits, Instance, on_trait_change
 from traitsui.api import View, Item
 from mayavi.core.ui.api import MayaviScene, MlabSceneModel, SceneEditor
 from mayavi import mlab
+from tvtk.api import tvtk
 
 
 # First, and before importing any Enthought packages, set the ETS_TOOLKIT
@@ -77,6 +78,19 @@ class MayaviQWidget(QtGui.QWidget):
         # Set up the data links
         self.figure = self.visualization.scene.mayavi_scene
         self.data_object = data_object
+        
+        
+        #Add time title
+        self.timestep_label = tvtk.TextActor(
+            input='0:00:00',
+            text_scale_mode='prop',
+            height=0.03)
+
+        self.timestep_label.position_coordinate.set(
+            coordinate_system='normalized_viewport',
+            value=(0.02, 0.02, 0.0))
+        
+        self.visualization.scene.add_actor(self.timestep_label)
         
         
         
