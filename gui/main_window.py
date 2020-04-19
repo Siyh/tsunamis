@@ -10,7 +10,7 @@ from tab_funwave import TabFUNWAVE
 
 import os
 
-from tsunamis.utilities.LoadMethods import LoadInput
+from tsunamis.utilities.io import LoadInput
 
 class TsunamiWindow(qw.QMainWindow):
     def __init__(self, initial_directory=''):
@@ -23,7 +23,7 @@ class TsunamiWindow(qw.QMainWindow):
         self.setWindowIcon(QtGui.QIcon('great_wave_tip.png'))
         
         # Restore the window position
-        self.settings = QtCore.QSettings('INeedACompanyName', 'TsunamiGUI')
+        self.settings = QtCore.QSettings('GoatsAndOats', 'TsunamiGUI')
         geometry = self.settings.value('geometry', '')
         if geometry:
             self.restoreGeometry(geometry)
@@ -38,6 +38,7 @@ class TsunamiWindow(qw.QMainWindow):
         #======================================================================
         self.menu_bar = self.menuBar()
         file_menu = self.menu_bar.addMenu('File')
+        # TODO make options for loading an NHWAVE configuration or a FUNWAVE configuration
         load_configurations = file_menu.addAction('Load configurations')
         load_configurations.triggered.connect(self.load_configurations)
 
@@ -95,16 +96,17 @@ class TsunamiWindow(qw.QMainWindow):
     
     def load_configurations(self):
         # Ask user for folder containing input.txt file
-        folder = str(qw.QFileDialog.getExistingDirectory(self, "Select Directory containing configuration data"))
+        folder = str(qw.QFileDialog.getExistingDirectory(self,
+                                                         "Select Directory containing configuration data"))
         # Load for nhwave tab
-        loadedParameters = LoadInput(os.path.join(folder,'input.txt'))
-        for key,value in loadedParameters.items():
-            if key in self.tab_nhwave.parameters.keys():
+        loadedParameters = LoadInput(os.path.join(folder, 'input.txt'))
+        for key, value in loadedParameters.items():            
+            if key in self.tab_nhwave.parameters:
                 self.tab_nhwave.parameters[key].setValue(value)
-                
+                                
         # Load for funwave tab
-        for key,value in loadedParameters.items():
-            if key in self.tab_funwave.parameters.keys():
+        for key, value in loadedParameters.items():
+            if key in self.tab_funwave.parameters:
                 self.tab_funwave.parameters[key].setValue(value)
                 
 

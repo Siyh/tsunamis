@@ -5,9 +5,9 @@ from PyQt5 import QtWidgets as qw
 import cartopy.crs as ccrs
 import numpy as np
 
-from common import WidgetMethods, build_wms_url
+from common import WidgetMethods#, build_wms_url
 from bokeh_widget import BokehMapQWidget
-from bokeh.models import ColumnDataSource, Line
+from bokeh.models import ColumnDataSource#, Line
 
 
 class TabMap(qw.QWidget, WidgetMethods):

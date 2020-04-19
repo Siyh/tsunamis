@@ -8,7 +8,7 @@ import os
 import requests
 from PIL import Image
 import datetime
-
+from glob import glob
 
 from mayavi_widget import MayaviQWidget, mlab
 from common import WidgetMethods, build_wms_url
@@ -21,7 +21,6 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         self.directory = directory
         self.results_directory = 'results/'
-        
         self.parameters = {}
         
         # Make all the components
@@ -35,7 +34,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.config_input_scroller.setMinimumWidth(400)
         
         viewer = qw.QWidget()
-        self.plot = MayaviQWidget(self, self)
+        self.plot = MayaviQWidget(self)
         plot_controls = qw.QWidget()
         
         # Arrange them
@@ -47,7 +46,6 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.addWidget(self.config_input_scroller)
         self.addWidget(viewer)   
         
-        
         steppersplit = qw.QVBoxLayout()
         plot_buttons = qw.QWidget()
         self.timestepper = qw.QSlider(Qt.Horizontal)
@@ -56,10 +54,21 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         steppersplit.addWidget(plot_buttons)
         steppersplit.addWidget(self.timestepper)
         plot_controls.setLayout(steppersplit)
+        display_options = self.create_input_group('Display options',
+                                                  main_layout=False)
+        self.display_wave_height = self.add_input('Wave height', value=True,
+                                                  function=self.display_wave_height_changed)
+        self.display_wave_max = self.add_input('Maximum wave height', value=False,
+                                               function=self.display_wave_max_changed)
+        self.display_wave_vectors = self.add_input('Wave vectors', value=False,
+                                                   function=self.display_wave_vectors_changed)
         
         stepper_buttons = qw.QHBoxLayout()
         stepper_buttons.setAlignment(Qt.AlignRight)
-        plot_buttons.setLayout(stepper_buttons)
+        plot_control_layout = qw.QHBoxLayout()
+        plot_control_layout.addWidget(display_options)
+        plot_control_layout.addLayout(stepper_buttons)
+        plot_buttons.setLayout(plot_control_layout)
         
         self.play_pause_button = qw.QPushButton('|>') 
         next_step = qw.QPushButton('>') 
@@ -74,9 +83,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         stepper_buttons.addWidget(restart)
         stepper_buttons.addWidget(previous_step)
         stepper_buttons.addWidget(next_step)
-        stepper_buttons.addWidget(self.play_pause_button)      
-        
-        
+        stepper_buttons.addWidget(self.play_pause_button)
         
         
         self.playing = False
@@ -136,31 +143,86 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                                        np.arange(0, dy * ny, dy))
         self.zs = (self.ys - self.ys.max()) / 2
         
-        self.bathymetry = self.zs
+        self.plot.set_location(self.xs, self.ys)
+        self.plot.draw_bathymetry(self.zs)
         
-        self.plot.draw_bathymetry()
+        # TODO find a way to stop this recalculating the timesteps each time
+        self.total_time_changed()
+        self.plot_start_changed()
+        self.plot_interval_changed()      
+        
+
+        
+        
+    def display_wave_height_changed(self):
+        if self.display_wave_height.isChecked():
+            self.plot.draw_wave_height(self.wave_heights[self.timestep])
+        else:
+            self.plot.hide_wave_height()
+        
+    def display_wave_max_changed(self):
+        if self.display_wave_max.isChecked():
+            pass
+        
+    def display_wave_vectors_changed(self):
+        if self.display_wave_vectors.isChecked():
+            pass
+            
+        
+    def recalculate_timesteps(self):
+        self.timesteps = np.arange(self.pv('PLOT_START'),
+                                   # Plus 1 to make the end time inclusive
+                                   self.pv('TOTAL_TIME') + 1,
+                                   self.pv('PLOT_INTV'))
+        
+        # Create a dictionary to hold the results
+        empty = {t: None for t in self.timesteps}
+        
+        # Copy this dictionary for each value, might be a better way of doing this
+        self.wave_heights = {**empty}
+        self.wave_maxs = {**empty}
+        self.wave_us = {**empty}
+        self.wave_vs = {**empty}
         
         
     def total_time_changed(self):
         self.timestepper.setMaximum(self.pv('TOTAL_TIME'))
+        self.recalculate_timesteps()
+        
         
     def plot_start_changed(self):
         self.timestepper.setMinimum(self.pv('PLOT_START'))
+        self.recalculate_timesteps()
+        
         
     def plot_interval_changed(self):
         interval = self.pv('PLOT_INTV')
         self.timestepper.setSingleStep(interval)
         self.timestepper.setTickInterval(interval)
+        self.recalculate_timesteps()
+        
         
     @property
     def timestep(self):
         return self.timestepper.value()
     
+    
+    @property
+    def num_of_timesteps(self):
+        return int((self.pv('TOTAL_TIME') - self.pv('PLOT_START'))
+                   / self.pv('PLOT_INTV'))
+    
+    
     def timestep_changed(self):
         time = datetime.timedelta(seconds=self.timestep)
         self.plot.timestep_label.input = str(time)
         
-        # TODO update wave output
+        wave = self.wave_heights[self.timestep]
+        if wave is None:
+            self.plot.hide_wave_height()
+        else:
+            self.plot.draw_wave_height(wave)
+        
         
     def play_pause_clicked(self):
         #TODO make this initiate the animate
@@ -180,6 +242,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             else:
                 self.animator = self.animate()
                 
+                
     @mlab.animate(delay=100, ui=False)    
     def animate(self):
         #So that the animation loop stops when the window is closed
@@ -190,12 +253,15 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             else:
                 self.next_timestep()
             yield
+            
     
     def next_timestep(self):
         self.timestepper.setValue(self.timestep + self.timestepper.singleStep())
         
+        
     def previous_timestep(self):
         self.timestepper.setValue(self.timestep - self.timestepper.singleStep())
+        
         
     def restart_timestepper(self):
         self.timestepper.setValue(0)
@@ -265,7 +331,9 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # TODO make this relative to self.directory
         self.results_directory = qw.QFileDialog.getExistingDirectory(self,
                                                    'Select {} results directory'.format(self.model.model),
-                                                   directory)   
+                                                   directory)           
+        self.read_results()
+        
     
     def set_directory(self):
         if self.directory:
@@ -340,21 +408,26 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         if run: self.read_results()
         
         
-    # TODO probably makes sense to move this to the model class
     def read_results(self):
-        # TODO
-        #need to figure out the timesteps, make a dictionary to hold the grids
-        # of values for each one. When they are loaded in, they can just
-        # replace the dictionary values
-        file_list = sorted(glob(self.results_directory + 'eta_*'),
-                               key=lambda name: int(name[-5:]))
+        #TODO generalise this function so it can load other types       
+        # Get a list of the results
+        files = glob(self.results_directory + '/eta_*')
+        if not files: return
+        # Sort the files by the number at the end of the file
+        file_list = sorted(files, key=lambda name: int(name[-5:]))        
         
+        # No wave for the first timestep
+        self.wave_heights[self.timesteps[0]] = np.zeros_like(self.zs)
         
-        
-        data = [np.zeros_like(self.depth)]
-        for i, path in enumerate(file_list):
+        # Load the remaining waves
+        for i, (time, path) in enumerate(zip(self.timesteps[1:], file_list)):
             print('\rLoading output {} of {}'.format(i + 1, len(file_list)), end='')
-            data.append(np.loadtxt(path))
+            self.wave_heights[time] = np.loadtxt(path)
+        print()
+        
+        self.display_wave_height_changed()
+        
+        
         
 if __name__ == '__main__':
     from run_gui import run
