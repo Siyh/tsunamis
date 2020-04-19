@@ -19,8 +19,8 @@ class config(model):
         script_folder = os.path.dirname(os.path.abspath(__file__))
         return os.path.abspath(os.path.join(script_folder, './../executables/nhwave'))
     
-#    def __init__(self, *args, **kwargs):        
-#        super().__init__(*args, **kwargs)
+    # def __init__(self, *args, **kwargs):        
+    #     super().__init__(*args, **kwargs)
         
     def load_esri_ascii(self, path, epsg, x0, x1, y0, y1, res, method='cubic'):
         """

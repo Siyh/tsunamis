@@ -21,21 +21,40 @@ def label_to_attribute(label):
 
     """
     return label.lower().replace(' ', '_')
-
-
-def create_combo(content):
+    
+    
+class CustomCombo(qw.QComboBox):
     """
-    Creates a combo box from either a dictionary of keys and values, or a list of 
-    values which are used as the keys with incrementing integers as the values
+    Adds some methods to a combobox to allow the text displayed in the 
+    combobox to differ from the values they correspond to.
+    It does this by storing values in a list (self.values) and looking them up
+    via the index of the selected entry in the combobox.
     """
-    if isinstance(content, list):
-        content = {k:i + 1 for i, k in enumerate(content)}
+    def assign_content(self, content):
+        """
+        Fills combo box from either a dictionary of keys and values, or a list of 
+        values which are used as the keys with incrementing integers as the values
+        """
+        if isinstance(content, list):
+            self.values = [i + 1 for i in range(len(content))]
+            self.addItems(content)
+        else:
+            # Assumed to be a dictionary
+            self.values = list(content.values())
+            self.addItems(content.keys())
         
-    c = qw.QComboBox()
-    for i, (k, v) in enumerate(content.items()):
-        c.addItem(str(v))
-        c.setItemText(i, k)
-    return c
+    def value(self):
+        return self.values[self.currentIndex()]
+    
+    def setValue(self, value):
+        # Find the index of the value we're looking to set
+        # Either in the text on the combobox
+        i = self.findText(str(value))
+        if i == -1:
+            # Or in the values to be returned
+            i = self.values.index(value)
+
+        self.setCurrentIndex(i)
         
 
 class WidgetMethods:
@@ -53,7 +72,7 @@ class WidgetMethods:
         return self._current_input_group
     
     
-    def add_input(self, label, model_varb_name, value,
+    def add_input(self, label, model_varb_name, value=None,
                   widget=None, default=None, function=None):  
         """
         Labels a widget and adds it to the input group. The widget type
@@ -92,41 +111,39 @@ class WidgetMethods:
         if widget is None:            
             if isinstance(value, bool):
                 widget = qw.QCheckBox()
-                widget.setChecked(value)
                 widget.setValue = widget.setChecked
                 widget.value = widget.isChecked
             elif isinstance(value, int):
                 widget = qw.QSpinBox()
                 widget.setRange(0, 2147483647)
-                widget.setValue(value)
             elif isinstance(value, float):
                 widget = qw.QDoubleSpinBox()
-                widget.setRange(0, 1E10)
-                widget.setValue(value)
+                widget.setRange(0, 1E10)                
             elif isinstance(value, (dict, list)):                
-                widget = create_combo(value)
-                widget.value = widget.currentIndex
-                widget.setValue = widget.setCurrentIndex
-                if default is not None:
-                    widget.setCurrentIndex(default)
+                widget = CustomCombo()
+                widget.assign_content(value)
+                # So the value gets set to the default below
+                value = default
             elif isinstance(value, str):
                 widget = qw.QLineEdit()                
-                widget.setText(value)
                 widget.setValue = widget.setText
                 widget.value = widget.text
             else:
                 raise Exception('Input widget type not recognised')
                 
+        if value is not None:
+            widget.setValue(value)
+                
         # Remember the widget acoording the model variable name, so the values
         # can be looked up when the model inputs are output
         self.parameters[model_varb_name] = widget
-        
+                
         # Put a label next to the widget and add them to the input list
         hbox = qw.QHBoxLayout()
         hbox.addWidget(qw.QLabel(label))
         hbox.addWidget(widget)        
         self._current_input_group.addLayout(hbox)
-        
+                
         # Link it to a function if desired
         if hasattr(widget, 'valueChanged'):
             if function is None:
@@ -135,6 +152,8 @@ class WidgetMethods:
             else:
                 widget.valueChanged.connect(function)
                 function()
+            
+        return widget
         
         
     def add_button(self, label, function):

@@ -104,17 +104,25 @@ class model:
     def write_config(self, output_directory=''):
         if not output_directory: output_directory = self.output_directory
         
-        print('Writing {} inputs...'.format(self.model))
+        print('Writing {} inputs to {}'.format(self.model, output_directory))
         
-        self.write_inputs(output_directory)
-        self.write_depth(output_directory)               
-        
+        self.write_inputs()
+        self.write_depth()      
+         
+        # Copy the executable
         self.target_executable_path = os.path.join(output_directory, self.executable_name)
-        copyfile(self.source_executable_path, self.target_executable_path)
+        copyfile(self.source_executable_path, self.target_executable_path)        
         
         if sys.platform == 'linux':
+            # Give the program the relevant permissions
             st = os.stat(self.program_path)
             os.chmod(self.program_path, st.st_mode | S_IEXEC)
+            
+        # Check the results folder exists and create it if not
+        results_folder_path = os.path.join(output_directory,
+                                           self.parameters['RESULT_FOLDER'])
+        if not os.path.exists(results_folder_path):
+            os.mkdir(results_folder_path)
         
         
     def write_inputs(self, path=''):
@@ -155,9 +163,9 @@ class model:
         else:
             input_path = output_directory
          
-        print(self.model + ' initiated with command:')
-        print(command + '\nin:\n' + input_path)
-        print('Output:')
+        # print(self.model + ' initiated with command:')
+        # print(command + '\nin:\n' + input_path)
+        print(self.model + 'output:')
         
         p = Popen(command, shell=True, cwd=input_path, stdout=PIPE)
         
