@@ -8,6 +8,10 @@ from tab_map import TabMap
 from tab_nhwave import TabNHWAVE
 from tab_funwave import TabFUNWAVE
 
+import os
+
+from tsunamis.utilities.LoadMethods import LoadInput
+
 class TsunamiWindow(qw.QMainWindow):
     def __init__(self, initial_directory=''):
         super().__init__()
@@ -86,9 +90,12 @@ class TsunamiWindow(qw.QMainWindow):
         pass
     
     def load_configurations(self):
-        pass
-    
-    
+        folder = str(qw.QFileDialog.getExistingDirectory(self, "Select Directory containing configuration data"))
+        loadedParameters = LoadInput(os.path.join(folder,'input.txt'))
+        for key,value in loadedParameters.items():
+            if key in self.tab_nhwave.parameters.keys():
+                self.tab_nhwave.parameters[key].setValue(value)
+        
     def closeEvent(self, event):
         # Save the window config
         self.settings.setValue('geometry', self.saveGeometry())

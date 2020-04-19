@@ -5,7 +5,7 @@ from PyQt5 import QtWidgets as qw
 import numpy as np
 
 from tab_model_base import TabModelBase
-from Tsunamis.models.nhwave import config as nhwave_config
+from tsunamis.models.nhwave import config as nhwave_config
 
 
 class TabNHWAVE(TabModelBase):
