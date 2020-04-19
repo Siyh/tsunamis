@@ -94,12 +94,20 @@ class TsunamiWindow(qw.QMainWindow):
         pass
     
     def load_configurations(self):
+        # Ask user for folder containing input.txt file
         folder = str(qw.QFileDialog.getExistingDirectory(self, "Select Directory containing configuration data"))
+        # Load for nhwave tab
         loadedParameters = LoadInput(os.path.join(folder,'input.txt'))
         for key,value in loadedParameters.items():
             if key in self.tab_nhwave.parameters.keys():
                 self.tab_nhwave.parameters[key].setValue(value)
-        
+                
+        # Load for funwave tab
+        for key,value in loadedParameters.items():
+            if key in self.tab_funwave.parameters.keys():
+                self.tab_funwave.parameters[key].setValue(value)
+                
+
     def closeEvent(self, event):
         # Save the window config
         self.settings.setValue('geometry', self.saveGeometry())
