@@ -25,7 +25,7 @@ class TsunamiWindow(qw.QMainWindow):
         self.setWindowIcon(QtGui.QIcon('great_wave_tip.png'))
         
         # Restore the window position
-        self.settings = QtCore.QSettings('INeedACompanyName', 'TsunamiGUI')
+        self.settings = QtCore.QSettings('GoatsAndOats', 'TsunamiGUI')
         geometry = self.settings.value('geometry', '')
         if geometry:
             self.restoreGeometry(geometry)

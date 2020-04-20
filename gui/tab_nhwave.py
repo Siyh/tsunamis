@@ -203,8 +203,8 @@ class TabNHWAVE(TabModelBase):
         blob = zt.clip(min=0)
         vol_est = np.sum(blob * self.pv('DX') * self.pv('DY')) / 1E9
         self.vol_est = '%i' % vol_est if vol_est > 10 else '%.1f' % vol_est
-        self.bathymetry = self.zs + blob
-        self.plot.draw_bathymetry()
+        
+        self.plot.draw_bathymetry(self.zs + blob)
         
 
 

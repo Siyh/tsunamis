@@ -59,24 +59,28 @@ class CustomCombo(qw.QComboBox):
 
 class WidgetMethods:
     
-    def create_input_group(self, title, function=None):
+    def create_input_group(self, title, function=None, main_layout=True):
         """
         Creates a vertical list upon which to place buttons and labelled widgets.
         If a function is given, it is called whenever one of the input group changes.
         """
         gb = qw.QGroupBox(title)
         self._current_input_group = qw.QVBoxLayout()
-        gb.setLayout(self._current_input_group)        
-        self.input_layout.addWidget(gb)
+        gb.setLayout(self._current_input_group)     
+        if main_layout:
+            self.input_layout.addWidget(gb)
         self._current_input_group_function = function
-        return self._current_input_group
+        return gb
     
     
-    def add_input(self, label, model_varb_name, value=None,
+    def add_input(self, label, model_varb_name='', value=None,
                   widget=None, default=None, function=None):  
         """
         Labels a widget and adds it to the input group. The widget type
         depends on the value used unless a widget is specified. 
+        
+        if model_varb_name is specified, the variable will be added to the list
+        that will be exported for the mode.
 
         Parameters
         ----------
@@ -136,7 +140,7 @@ class WidgetMethods:
                 
         # Remember the widget acoording the model variable name, so the values
         # can be looked up when the model inputs are output
-        self.parameters[model_varb_name] = widget
+        if model_varb_name: self.parameters[model_varb_name] = widget
                 
         # Put a label next to the widget and add them to the input list
         hbox = qw.QHBoxLayout()
@@ -151,7 +155,6 @@ class WidgetMethods:
                     widget.valueChanged.connect(self._current_input_group_function)
             else:
                 widget.valueChanged.connect(function)
-                function()
             
         return widget
         

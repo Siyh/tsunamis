@@ -52,7 +52,7 @@ class Visualization(HasTraits):
 ################################################################################
 # The QWidget containing the visualization, this is pure PyQt4 code.
 class MayaviQWidget(QtGui.QWidget):
-    def __init__(self, parent, data_object):
+    def __init__(self, parent):
         
         QtGui.QWidget.__init__(self, parent)
         layout = QtGui.QVBoxLayout(self)
@@ -77,7 +77,6 @@ class MayaviQWidget(QtGui.QWidget):
         
         # Set up the data links
         self.figure = self.visualization.scene.mayavi_scene
-        self.data_object = data_object
         
         
         #Add time title
@@ -92,30 +91,60 @@ class MayaviQWidget(QtGui.QWidget):
         
         self.visualization.scene.add_actor(self.timestep_label)
         
+        self.wave_height = None
+        self.wave_max = None
+        self.wave_vectors = None
         
         
+    def set_location(self, xs, ys):
+        self.xs = xs.T
+        self.ys = ys.T
+        
+        
+    def hide_wave_height(self):
+        if self.wave_height is not None:
+            self.wave_height.visible = False
+            self.wave_height = None
+        
+    def draw_wave_height(self, heights):
+        # If the wave hasn't already been drawn, update it
+        if self.wave_height is None:
+            self.wave_height = mlab.surf(self.xs,
+                                         self.ys,
+                                         heights.T,
+                                         warp_scale=1,
+                                         colormap='jet',
+                                         figure=self.figure)
+        # Otherwise update the existing wave
+        else:
+            self.wave_height.mlab_source.scalars = heights.T
         
    
         
-    def draw_bathymetry(self):
+    def draw_bathymetry(self, bathymetry):
         if not self.figure: return
-
-        mlab.clf(figure=self.figure)
         
-        self.bathymetry = mlab.surf(self.data_object.xs.T,
-                                    self.data_object.ys.T,
-                                    self.data_object.bathymetry.T,
-                                    warp_scale=1,
-                                    colormap='gist_earth',
-                                    figure=self.figure) 
-                
-        self.contours = mlab.contour_surf(self.data_object.xs.T,
-                                          self.data_object.ys.T,
-                                          self.data_object.bathymetry.T,
-                                          contours=[0],
-                                          warp_scale=1,
-                                          color=(0, 0, 0),
-                                          figure=self.figure) 
+        # If the bathymetry has already been drawn, update the current one
+        if hasattr(self, 'bathymetry'):
+            self.bathymetry.mlab_source.scalars = bathymetry.T
+            self.contours.mlab_source.scalars = bathymetry.T
+        
+        # Otherwise draw it for the first time
+        else:
+            self.bathymetry = mlab.surf(self.xs,
+                                        self.ys,
+                                        bathymetry.T,
+                                        warp_scale=1,
+                                        colormap='gist_earth',
+                                        figure=self.figure) 
+                    
+            self.contours = mlab.contour_surf(self.xs,
+                                              self.ys,
+                                              bathymetry.T,
+                                              contours=[0],
+                                              warp_scale=1,
+                                              color=(0, 0, 0),
+                                              figure=self.figure) 
                 
         # self.make_scale_bar()
         
