@@ -12,7 +12,7 @@ import os
 
 import re
 
-from tsunamis.utilities.LoadMethods import LoadInput
+from tsunamis.utilities.io import LoadInput
 
 class TsunamiWindow(qw.QMainWindow):
     def __init__(self, initial_directory=''):
@@ -100,24 +100,25 @@ class TsunamiWindow(qw.QMainWindow):
     def load_data(self, path):
         pass
     
-    def load_configurations(self,tab):
+    def load_configurations(self, tab):
         # Ask user for folder containing input.txt file
-        folder = str(qw.QFileDialog.getExistingDirectory(self, "Select Directory containing configuration data"))
+        folder = str(qw.QFileDialog.getExistingDirectory(self, \
+                 "Select Directory containing configuration data"))
         # Load parameters from input.txt
-        loadedParameters = LoadInput(os.path.join(folder,'input.txt'))
+        loadedParameters = LoadInput(os.path.join(folder, 'input.txt'))
         
         # Bools to figure out which button was clicked
-        isNhwave = bool(re.match(tab,'nhwave'))
-        isFunwave = bool(re.match(tab,'funwave'))
+        isNhwave = bool(re.match(tab, 'nhwave'))
+        isFunwave = bool(re.match(tab, 'funwave'))
         
         # Run for either nhwave tab or funwave tab depending in bools
         if isNhwave:
             for key,value in loadedParameters.items():
-                if key in self.tab_nhwave.parameters.keys():
+                if key in self.tab_nhwave.parameters:
                     self.tab_nhwave.parameters[key].setValue(value)
         elif isFunwave:
             for key,value in loadedParameters.items():
-                if key in self.tab_funwave.parameters.keys():
+                if key in self.tab_funwave.parameters:
                     self.tab_funwave.parameters[key].setValue(value)
                 
 
