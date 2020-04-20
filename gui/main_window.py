@@ -10,6 +10,8 @@ from tab_funwave import TabFUNWAVE
 
 import os
 
+import re
+
 from tsunamis.utilities.LoadMethods import LoadInput
 
 class TsunamiWindow(qw.QMainWindow):
@@ -38,8 +40,13 @@ class TsunamiWindow(qw.QMainWindow):
         #======================================================================
         self.menu_bar = self.menuBar()
         file_menu = self.menu_bar.addMenu('File')
-        load_configurations = file_menu.addAction('Load configurations')
-        load_configurations.triggered.connect(self.load_configurations)
+        # Add load nhwave input button and connect to specific function
+        load_nhwave_input = file_menu.addAction('Load nhwave input file')
+        load_nhwave_input.triggered.connect(lambda: self.load_configurations('nhwave'))
+        
+        # Add load funwave input button and connect to specific function
+        load_funwave_input = file_menu.addAction('Load funwave input file')
+        load_funwave_input.triggered.connect(lambda: self.load_configurations('funwave'))
 
         # Allow the GUI to be quit when run from Spyder
         debugging = self.menu_bar.addMenu('Debugging')
@@ -93,19 +100,25 @@ class TsunamiWindow(qw.QMainWindow):
     def load_data(self, path):
         pass
     
-    def load_configurations(self):
+    def load_configurations(self,tab):
         # Ask user for folder containing input.txt file
         folder = str(qw.QFileDialog.getExistingDirectory(self, "Select Directory containing configuration data"))
-        # Load for nhwave tab
+        # Load parameters from input.txt
         loadedParameters = LoadInput(os.path.join(folder,'input.txt'))
-        for key,value in loadedParameters.items():
-            if key in self.tab_nhwave.parameters.keys():
-                self.tab_nhwave.parameters[key].setValue(value)
-                
-        # Load for funwave tab
-        for key,value in loadedParameters.items():
-            if key in self.tab_funwave.parameters.keys():
-                self.tab_funwave.parameters[key].setValue(value)
+        
+        # Bools to figure out which button was clicked
+        isNhwave = bool(re.match(tab,'nhwave'))
+        isFunwave = bool(re.match(tab,'funwave'))
+        
+        # Run for either nhwave tab or funwave tab depending in bools
+        if isNhwave:
+            for key,value in loadedParameters.items():
+                if key in self.tab_nhwave.parameters.keys():
+                    self.tab_nhwave.parameters[key].setValue(value)
+        elif isFunwave:
+            for key,value in loadedParameters.items():
+                if key in self.tab_funwave.parameters.keys():
+                    self.tab_funwave.parameters[key].setValue(value)
                 
 
     def closeEvent(self, event):
