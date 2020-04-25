@@ -10,6 +10,7 @@ from subprocess import Popen, PIPE
 from stat import S_IEXEC
 from matplotlib.widgets import Slider, Button, RadioButtons
 from pandas import read_table
+from tsunamis.utilities.io import load_config_file
 
 #from builtins import print as bprint
 #def print(*args, **kwargs):
@@ -72,26 +73,8 @@ class model:
         if not path: path = os.path.join(self.input_directory, self.input_file)
         if not os.path.exists(path): return
         
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    if line[0] != '!':
-                        try:
-                            k, vs = line.split(' = ')
-                        except:
-                            print('Odd line: ' + line)
-                            continue
-                        try:
-                            v = float(vs) if '.' in vs else int(vs)
-                        except:
-                            if vs == 'T':
-                                v = True
-                            elif vs == 'F':
-                                v = False
-                            else:
-                                v = vs
-                        self.parameters[k] = v
+        self.parameters = load_config_file(path)
+                        
                         
                         
     def load_depth(self, path=''):
@@ -99,6 +82,7 @@ class model:
         if not os.path.exists(path): return
         
         self.depth = np.loadtxt(path)
+        
         
                         
     def write_config(self, output_directory=''):
@@ -123,6 +107,7 @@ class model:
                                            self.parameters['RESULT_FOLDER'])
         if not os.path.exists(results_folder_path):
             os.mkdir(results_folder_path)
+            
         
         
     def write_inputs(self, path=''):
@@ -145,6 +130,7 @@ class model:
         if self.depth.mean() < 0:
             print('WARNING, inputs must be depth not elevation')
         np.savetxt(path, self.depth, fmt='%5.1f')
+        
         
         
     def run(self, output_directory=''):
@@ -199,7 +185,9 @@ class model:
         print('Converting xyz data to grid')        
         self.depth = zs.reshape((int(self.Nglob), int(self.Mglob)))
         
-        self.check_save_depth(elevation)        
+        self.check_save_depth(elevation)       
+        
+        
         
     def evg_to_grid(self, evg_path, elevation=True, to_cell_centre=True):
         """Convert from earthvision grid to model format"""
@@ -322,6 +310,7 @@ class model:
         
         plt.show()
         
+        
     def grid_range(self, grid):
         """Give information about a grid of data"""
         print('Grid shape:', grid.shape)
@@ -330,8 +319,10 @@ class model:
         nanc = np.sum(np.isnan(grid))
         if nanc: print('Nan count:', nanc)
         
+        
     def gs(self, xn, xd, xe=0):
         return np.linspace(0, int(xn) * float(xd), int(xn)) + float(xe)
+    
         
     def export(self, file_form, x0, y0, result_to_convert=False,
             save_path=False, to_elevation=True):
@@ -433,6 +424,7 @@ class MidpointNormalize(Normalize):
     def __call__(self, value, clip=None):
         x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
         return np.ma.masked_array(np.interp(value, x, y))
+    
                 
 def single_view(results_path, model, folder, folder_path):
     results = glob(os.path.join(results_path, 'eta_*'))
@@ -464,6 +456,7 @@ def single_view(results_path, model, folder, folder_path):
     if not os.path.isdir(save_folder): os.mkdir(save_folder)                
     plt.savefig(os.path.join(save_folder, name + '.png'), bbox_inches='tight')
     plt.close()
+    
         
 def batch_view(folder_name):
     """
@@ -479,6 +472,7 @@ def batch_view(folder_name):
             if os.path.isdir(model_path):
                 single_view(os.path.join(model_path, 'results'), model,
                         folder, folder_path)
+                
                         
 def batch_graph(folder_name, model='nhwave'):
     """

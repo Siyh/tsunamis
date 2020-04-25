@@ -11,7 +11,7 @@ import datetime
 from glob import glob
 
 from mayavi_widget import MayaviQWidget, mlab
-from common import WidgetMethods, build_wms_url
+from common import WidgetMethods, build_wms_url, DoubleSlider
 
 
 class TabModelBase(qw.QSplitter, WidgetMethods):
@@ -48,7 +48,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         steppersplit = qw.QVBoxLayout()
         plot_buttons = qw.QWidget()
-        self.timestepper = qw.QSlider(Qt.Horizontal)
+        self.timestepper = DoubleSlider(orientation=Qt.Horizontal)
         self.timestepper.setTickPosition(qw.QSlider.TicksBelow)
         self.timestepper.valueChanged.connect(self.timestep_changed)
         steppersplit.addWidget(plot_buttons)
@@ -97,7 +97,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.add_button('Run ' + self.model.model, self.run_model_clicked)  
         
         self.add_button('Set model folder', self.set_directory) 
-        self.add_button('Set results folder', self.set_results_clicked)        
+        self.add_button('Set results folder', self.set_results_clicked)      
+        self.add_button('Load configuration', lambda: parent.load_configurations(self))
         self.add_input('Processor number X', 'PX', 2)
         self.add_input('Processor number Y', 'PY', 2)
         
@@ -107,8 +108,14 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         step_widget.setSingleStep(100)
         #TODO make this accept different units of time, not just seconds
         self.add_input('Total time', 'TOTAL_TIME', 300.0, function=self.total_time_changed)
+        self.timestepper.setMaximum(300)
         self.add_input('Output time start', 'PLOT_START', 0.0, function=self.plot_start_changed)
+        self.timestepper.setMinimum(0.0)
         self.add_input('Output interval', 'PLOT_INTV', 10.0, function=self.plot_interval_changed)
+        self.timestepper.setSingleStep(10.0)
+        self.timestepper.setTickInterval(10.0)
+        self.recalculate_timesteps()
+        
         self.add_input('Screen output interval', 'SCREEN_INTV', 10.0)
         self.add_input('Initial timestep size', 'DT_INI', 2.0)
         self.add_input('Minimium timestep', 'DT_MIN', 0.01)
@@ -117,7 +124,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.add_input('Hotstart', 'HOTSTART', False)
         
         
-        self.create_input_group('Bathymetry')
+        self.create_input_group('Bathymetry', self.make_grid_coords)
         self.add_button('Load bathymetry from grid', self.load_depth_clicked)
         self.add_button('Load bathymetry from map', self.download_bathymetry)
         
@@ -134,25 +141,17 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.add_input('Analytical bathymetry', 'ANA_BATHY', False)
         self.add_input('DepConst', 'DepConst', 0.3)        
         
-        # Make dummy x and y grids
-        dx = self.parameters['DX'].value()
-        dy = self.parameters['DY'].value()
-        nx = self.parameters['Mglob'].value()
-        ny = self.parameters['Nglob'].value()
-        self.xs, self.ys = np.meshgrid(np.arange(0, dx * nx, dx),
-                                       np.arange(0, dy * ny, dy))
+        self.x0 = 0
+        self.y0 = 0
+        self.make_grid_coords()
+        
+        # Make dummy zs
         self.zs = (self.ys - self.ys.max()) / 2
         
         self.plot.set_location(self.xs, self.ys)
         self.plot.draw_bathymetry(self.zs)
         
-        # TODO find a way to stop this recalculating the timesteps each time
-        self.total_time_changed()
-        self.plot_start_changed()
-        self.plot_interval_changed()      
-        
-
-        
+   
         
     def display_wave_height_changed(self):
         if self.display_wave_height.isChecked():
@@ -171,34 +170,33 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
     def recalculate_timesteps(self):
         self.timesteps = np.arange(self.pv('PLOT_START'),
-                                   # Plus 1 to make the end time inclusive
-                                   self.pv('TOTAL_TIME') + 1,
+                                   # Extra to make the end time inclusive
+                                   self.pv('TOTAL_TIME') + self.pv('PLOT_INTV') / 2,
                                    self.pv('PLOT_INTV'))
         
         # Create a dictionary to hold the results
         empty = {t: None for t in self.timesteps}
         
-        # Copy this dictionary for each value, might be a better way of doing this
+        # Copy this dictionary for each value, probably a better way of doing this
         self.wave_heights = {**empty}
         self.wave_maxs = {**empty}
         self.wave_us = {**empty}
         self.wave_vs = {**empty}
         
         
-    def total_time_changed(self):
-        self.timestepper.setMaximum(self.pv('TOTAL_TIME'))
+    def total_time_changed(self, value):
+        self.timestepper.setMaximum(value)
         self.recalculate_timesteps()
         
         
-    def plot_start_changed(self):
-        self.timestepper.setMinimum(self.pv('PLOT_START'))
+    def plot_start_changed(self, value):
+        self.timestepper.setMinimum(value)
         self.recalculate_timesteps()
         
         
-    def plot_interval_changed(self):
-        interval = self.pv('PLOT_INTV')
-        self.timestepper.setSingleStep(interval)
-        self.timestepper.setTickInterval(interval)
+    def plot_interval_changed(self, value):
+        self.timestepper.setSingleStep(value)
+        self.timestepper.setTickInterval(value)
         self.recalculate_timesteps()
         
         
@@ -265,6 +263,15 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
     def restart_timestepper(self):
         self.timestepper.setValue(0)
+        
+        
+    def make_grid_coords(self):
+        dx = self.parameters['DX'].value()
+        dy = self.parameters['DY'].value()
+        self.x1 = self.x0 + dx * self.parameters['Mglob'].value()
+        self.y1 = self.y0 + dy * self.parameters['Nglob'].value()
+        self.xs, self.ys = np.meshgrid(np.arange(self.x0, self.x1, dx),
+                                       np.arange(self.x0, self.y1, dy))
 
         
     def download_bathymetry(self):
@@ -313,12 +320,18 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         elif extension == 'asc':
             self.load_arcascii(fname)
         elif extension == 'txt':
-            self.zs = np.loadtxt(fname)
+            self.zs = -np.loadtxt(fname)
             
-        # TODO set cell size according to file
+        # TODO set cell size according to file if appropriate
         #self.parameters['DX'].setValue()
         
-        self.plot.draw_bathymetry(self.zs)
+        ny, nx = self.zs.shape
+        self.parameters['Mglob'].setValue(nx)
+        self.parameters['Nglob'].setValue(ny)    
+        
+        self.make_grid_coords()
+        
+        self.plot.draw_bathymetry(self.zs)        
         
     
     

@@ -30,12 +30,15 @@ class TabNHWAVE(TabModelBase):
         
         self.create_input_group('Landslides', self.recalculate_landslide)
         self.add_input('Slide type', 'SlideType',
-                       {'rigid':'RIGID_3D', 'deformable':'DEFORMABLE'})
+                       {'rigid (nhwave 2.0)':'RIGID',
+                        'rigid (nhwave 3.0)':'RIGID_3D',
+                        'deformable':'DEFORMABLE'})
         self.add_input('Thickness', 'SlideT', 30.0)
         self.add_input('Length', 'SlideL', 200.0)
         self.add_input('Width', 'SlideW', 500.0)
         self.add_input('Direction', 'SlideAngle', 270.0)
         self.add_input('Slope angle', 'SlopeAngle', 10.0)
+        # TODO add option to make this relative
         self.add_input('X coordinate', 'SlideX0', 1000.0)
         self.add_input('Y coordinate', 'SlideY0', 1000.0)
         self.add_input('Max speed?', 'SlideUt', 10.0)
@@ -140,12 +143,17 @@ class TabNHWAVE(TabModelBase):
         
         
         self.create_input_group('Outputs')
-        self.add_input('water depth', 'OUT_H', True)
+        self.add_input('water depth', 'OUT_H', True,
+                       function=self.display_wave_height.setEnabled)
         self.add_input('surface elevation', 'OUT_E', True)
-        self.add_input('velocity in x direction', 'OUT_U', True)
-        self.add_input('velocity in y direction', 'OUT_V', False)
-        self.add_input('velocity in z direction', 'OUT_W', False)
+        self.add_input('velocity in x direction', 'OUT_U', True,
+                       function=self.vector_output_changed)
+        self.add_input('velocity in y direction', 'OUT_V', True,
+                       function=self.vector_output_changed)
+        self.add_input('velocity in z direction', 'OUT_W', False,
+                       function=self.vector_output_changed)
         self.add_input('dynamic pressure', 'OUT_P', False)
+
         self.add_input('turbulent kinetic energy', 'OUT_K', False)
         self.add_input('turbulent dissipation rate', 'OUT_D', False)
         self.add_input('shear production', 'OUT_S', False)
@@ -157,12 +165,21 @@ class TabNHWAVE(TabModelBase):
         self.add_input('bed elevation', 'OUT_G', False)
         self.add_input('salinity', 'OUT_I', False)
         self.add_input('varying bathymetry', 'OUT_Z', False)
-        self.add_input('max wave height', 'OUT_M', True)
+        self.add_input('max wave height', 'OUT_M', True,
+                       function=self.display_wave_max.setEnabled)
         
         # Implement GUI version of probe outputs
         self.add_input('number of probes', 'NSTAT', 0)
         self.add_input('probe start time', 'PLOT_INTV_STAT', 10.0)
         
+    
+    def vector_output_changed(self, _):
+        # TODO why isn't this working
+        print('Vecotr output changed')
+        self.display_wave_vectors.setEnabled(self.pv('OUT_U') or
+                                             self.pv('OUT_V') or
+                                             self.pv('OUT_W'))
+
         
     def timestep_changed(self):
         self.recalculate_landslide()          
@@ -192,8 +209,14 @@ class TabNHWAVE(TabModelBase):
         s0 = ut ** 2 / a0
         
         st = s0 * np.log(np.cosh(self.timestep / t0)) * coss0
-        lsx = self.pv('SlideX0') + st * cosa0 + self.xs[0, 0]
-        lsy = self.pv('SlideY0') + st * sina0 + self.ys[0, 0]
+        
+        x = self.pv('SlideX0')
+        y = self.pv('SlideY0')
+        if not (self.x0 < x < self.x1) or not (self.y0 < y < self.y1):
+            print(self.x0, x, self.x1)
+            print('Landslide out of grid bounds')
+        lsx = x + st * cosa0 + self.xs[0, 0]
+        lsy = y + st * sina0 + self.ys[0, 0]
         
         xsmlsx = self.xs - lsx
         ysmlsy = self.ys - lsy

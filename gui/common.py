@@ -2,6 +2,7 @@
 # Simon Libby 2020
 
 from PyQt5 import QtWidgets as qw
+from PyQt5.QtCore import pyqtSignal
 
 
 def label_to_attribute(label):
@@ -23,7 +24,7 @@ def label_to_attribute(label):
     return label.lower().replace(' ', '_')
     
     
-class CustomCombo(qw.QComboBox):
+class DictionaryCombo(qw.QComboBox):
     """
     Adds some methods to a combobox to allow the text displayed in the 
     combobox to differ from the values they correspond to.
@@ -56,6 +57,47 @@ class CustomCombo(qw.QComboBox):
 
         self.setCurrentIndex(i)
         
+        
+class DoubleSlider(qw.QSlider):
+    # Modifies a slider class to use doubles as opposed to ints
+    #https://stackoverflow.com/questions/42820380/use-float-for-qslider
+    # create our our signal that we can connect to if necessary
+    doubleValueChanged = pyqtSignal(float)
+
+    def __init__(self, decimals=3, *args, **kargs):
+        super(DoubleSlider, self).__init__( *args, **kargs)
+        self._multi = 10 ** decimals
+
+        self.valueChanged.connect(self.emitDoubleValueChanged)
+
+    def emitDoubleValueChanged(self):
+        value = float(super(DoubleSlider, self).value())/self._multi
+        self.doubleValueChanged.emit(value)
+        
+    def setValue(self, value):
+        super(DoubleSlider, self).setValue(int(value * self._multi))
+        
+    def value(self):
+        return float(super(DoubleSlider, self).value()) / self._multi
+
+    def setMinimum(self, value):
+        return super(DoubleSlider, self).setMinimum(value * self._multi)
+
+    def setMaximum(self, value):
+        return super(DoubleSlider, self).setMaximum(value * self._multi)
+
+    def setSingleStep(self, value):
+        return super(DoubleSlider, self).setSingleStep(value * self._multi)
+
+    def singleStep(self):
+        return float(super(DoubleSlider, self).singleStep()) / self._multi
+    
+    def setTickInterval(self, value):
+        return super(DoubleSlider, self).setTickInterval(value * self._multi)
+
+    
+        
+        
 
 class WidgetMethods:
     
@@ -81,6 +123,7 @@ class WidgetMethods:
         
         if model_varb_name is specified, the variable will be added to the list
         that will be exported for the mode.
+        
 
         Parameters
         ----------
@@ -95,8 +138,9 @@ class WidgetMethods:
         default :  optional
             Only used if the value was a dict. The default is None.
         function : function, optional
-            function to call when the value of the widget changes. If not
-            provided, uses the one specified for the input group if that
+            function to call when the value of the widget changes, with the 
+            new value passed as an argument.
+            If not provided, uses the one specified for the input group if that
             was provided.
 
         Raises
@@ -124,7 +168,7 @@ class WidgetMethods:
                 widget = qw.QDoubleSpinBox()
                 widget.setRange(0, 1E10)                
             elif isinstance(value, (dict, list)):                
-                widget = CustomCombo()
+                widget = DictionaryCombo()
                 widget.assign_content(value)
                 # So the value gets set to the default below
                 value = default
@@ -147,14 +191,15 @@ class WidgetMethods:
         hbox.addWidget(qw.QLabel(label))
         hbox.addWidget(widget)        
         self._current_input_group.addLayout(hbox)
-                
         # Link it to a function if desired
         if hasattr(widget, 'valueChanged'):
             if function is None:
                 if self._current_input_group_function is not None:
                     widget.valueChanged.connect(self._current_input_group_function)
             else:
-                widget.valueChanged.connect(function)
+                # The lamda function means the called function will be passed
+                # the new value of the widget when it changes
+                widget.valueChanged.connect(lambda: function(widget.value()))
             
         return widget
         

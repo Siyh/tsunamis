@@ -1,16 +1,9 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Apr 17 15:36:06 2020
+# Functions for IO to Tsunami GUI
+# Simon Libby and Marcus Wild 2020
 
-@author: Marcus
-"""
-import os
 
-def LoadInput(path):
-    if not path: path = os.path.join(path, "input.txt")
-    if not os.path.exists(path): return
-    parameters={}
-    
+def load_config_file(path):     
+    parameters = {}
     with open(path) as f:
         for line in f:
             line = line.strip()
@@ -21,9 +14,13 @@ def LoadInput(path):
                     except:
                         print('Odd line: ' + line)
                         continue
-                    try:
-                        v = float(vs) if '.' in vs else int(vs)
-                    except:
+                    try:                            
+                        # Might be a better way to check for different float types
+                        if any(c in vs for c in ['.', 'e', 'E']):
+                            v = float(vs) 
+                        else:
+                            v = int(vs)
+                    except ValueError:
                         if vs == 'T':
                             v = True
                         elif vs == 'F':
@@ -33,7 +30,7 @@ def LoadInput(path):
                     parameters[k] = v
                     
     return parameters
-                
+
 
                 
                 

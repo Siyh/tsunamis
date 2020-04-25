@@ -10,9 +10,8 @@ from tab_funwave import TabFUNWAVE
 
 import os
 
-import re
 
-from tsunamis.utilities.io import LoadInput
+from tsunamis.utilities.io import load_config_file
 
 class TsunamiWindow(qw.QMainWindow):
     def __init__(self, initial_directory=''):
@@ -42,11 +41,11 @@ class TsunamiWindow(qw.QMainWindow):
         file_menu = self.menu_bar.addMenu('File')
         # Add load nhwave input button and connect to specific function
         load_nhwave_input = file_menu.addAction('Load nhwave input file')
-        load_nhwave_input.triggered.connect(lambda: self.load_configurations('nhwave'))
+        load_nhwave_input.triggered.connect(lambda: self.load_configurations(self.tab_nhwave))
         
         # Add load funwave input button and connect to specific function
         load_funwave_input = file_menu.addAction('Load funwave input file')
-        load_funwave_input.triggered.connect(lambda: self.load_configurations('funwave'))
+        load_funwave_input.triggered.connect(lambda: self.load_configurations(self.tab_funwave))
 
         # Allow the GUI to be quit when run from Spyder
         debugging = self.menu_bar.addMenu('Debugging')
@@ -101,25 +100,26 @@ class TsunamiWindow(qw.QMainWindow):
         pass
     
     def load_configurations(self, tab):
-        # Ask user for folder containing input.txt file
-        folder = str(qw.QFileDialog.getExistingDirectory(self, \
-                 "Select Directory containing configuration data"))
-        # Load parameters from input.txt
-        loadedParameters = LoadInput(os.path.join(folder, 'input.txt'))
+        #Implement a current directory system
+        desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
         
-        # Bools to figure out which button was clicked
-        isNhwave = bool(re.match(tab, 'nhwave'))
-        isFunwave = bool(re.match(tab, 'funwave'))
-        
-        # Run for either nhwave tab or funwave tab depending in bools
-        if isNhwave:
-            for key,value in loadedParameters.items():
-                if key in self.tab_nhwave.parameters:
-                    self.tab_nhwave.parameters[key].setValue(value)
-        elif isFunwave:
-            for key,value in loadedParameters.items():
-                if key in self.tab_funwave.parameters:
-                    self.tab_funwave.parameters[key].setValue(value)
+        fname, extension = qw.QFileDialog.getOpenFileName(self,
+                                                          'Open model configuration file',
+                                                          desktop,
+                                                          'Text file (*.txt);;Other (*.*)')
+
+        # Load parameters from input text file
+        loadedParameters = load_config_file(fname)
+                
+        # Run for the provided tab
+        for key, value in loadedParameters.items():
+            if key in tab.parameters:
+                try:
+                    tab.parameters[key].setValue(value)
+                except TypeError:
+                    print('parameter {} with value {} has unexpected type'.format(key, value))
+                    print(type(value), 'instead of type', type(tab.parameters[key].value()))
+
                 
 
     def closeEvent(self, event):

@@ -39,9 +39,7 @@ class Visualization(HasTraits):
         # VTK features require a GLContext.
         
         # TODO this is causing errors
-        #mlab.orientation_axes(figure=self.scene.mayavi_scene)
         pass
-
     # the layout of the dialog screated
     view = View(Item('scene', editor=SceneEditor(scene_class=MayaviScene),
                      height=250, width=300, show_label=False),
@@ -96,6 +94,7 @@ class MayaviQWidget(QtGui.QWidget):
         self.wave_vectors = None
         
         
+        
     def set_location(self, xs, ys):
         self.xs = xs.T
         self.ys = ys.T
@@ -145,6 +144,9 @@ class MayaviQWidget(QtGui.QWidget):
                                               warp_scale=1,
                                               color=(0, 0, 0),
                                               figure=self.figure) 
+            
+            mlab.orientation_axes(figure=self.figure)
+
                 
         # self.make_scale_bar()
         
