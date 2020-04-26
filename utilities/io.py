@@ -2,7 +2,7 @@
 # Simon Libby and Marcus Wild 2020
 
 
-def load_config_file(path):     
+def read_configuration_file(path):     
     parameters = {}
     with open(path) as f:
         for line in f:

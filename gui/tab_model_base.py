@@ -12,15 +12,16 @@ from glob import glob
 
 from mayavi_widget import MayaviQWidget, mlab
 from common import WidgetMethods, build_wms_url, DoubleSlider
-
+from tsunamis.utilities.io import read_configuration_file
 
 class TabModelBase(qw.QSplitter, WidgetMethods):
     
-    def __init__(self, parent, directory=''):
+    def __init__(self, parent, model_folder=''):
         super().__init__(parent)
         
-        self.directory = directory
-        self.results_directory = 'results/'
+        self.results_folder = 'results'
+        self.configuration_path = 'input.txt'
+        self.depth_path = 'depth.txt'
         self.parameters = {}
         
         # Make all the components
@@ -96,9 +97,9 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.create_input_group('General')        
         self.add_button('Run ' + self.model.model, self.run_model_clicked)  
         
-        self.add_button('Set model folder', self.set_directory) 
-        self.add_button('Set results folder', self.set_results_clicked)      
-        self.add_button('Load configuration', lambda: parent.load_configurations(self))
+        self.add_button('Set model folder', self.set_model_folder) 
+        self.add_button('Set results folder', self.set_results_folder)      
+        self.add_button('Load configuration', self.set_configuration_file)
         self.add_input('Processor number X', 'PX', 2)
         self.add_input('Processor number Y', 'PY', 2)
         
@@ -126,7 +127,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         
         self.create_input_group('Bathymetry', self.make_grid_coords)
-        self.add_button('Load bathymetry from grid', self.load_depth_clicked)
+        self.add_button('Load bathymetry from grid', self.set_depth_file)
         self.add_button('Load bathymetry from map', self.download_bathymetry)
         
         self.add_input('Number of cells in the X direction', 'Mglob', 400)
@@ -151,6 +152,15 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         self.plot.set_location(self.xs, self.ys)
         self.plot.draw_bathymetry(self.zs)
+        
+        if model_folder:
+            self.model_folder = model_folder
+            self.load_directory()
+        else:
+            # TODO this is windows specific
+            self.model_folder = os.path.join(os.environ['USERPROFILE'],
+                                             'Desktop',
+                                             self.model.model) 
         
    
         
@@ -293,13 +303,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         print(elevation_colours)
         
-        #TODO map colours to elevation
-        
+        #TODO map colours to elevation        
 
     
         
-    def load_depth_clicked(self):
-        desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    def set_depth_file(self):
         
         formats = ['Any compatible (*.nc *.asc, *.txt)',
                    'NetCDF (*.nc)',
@@ -309,20 +317,53 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
 
         fname, extension = qw.QFileDialog.getOpenFileName(self,
                                                           'Open depth grid',
-                                                          desktop,
+                                                          self.model_folder,
                                                           ';;'.join(formats))
-        if not fname: return
+        if fname: 
+            self.load_depth_file(fname)
+            
+            
+    def set_results_folder(self):        
+        # TODO make this relative to self.directory
+        folder = qw.QFileDialog.getExistingDirectory(self,
+                                                     'Select {} results folder'.format(self.model.model),
+                                                     self.model_folder)   
+        if folder:
+            self.results_folder = folder        
+            self.load_results()
         
-        extension = fname.rsplit('.', 1)[1].lower()
+    
+    def set_model_folder(self):        
+        folder = qw.QFileDialog.getExistingDirectory(self,
+                                                     'Select {} folder'.format(self.model.model),
+                                                     self.model_folder) 
+        if folder:
+            self.model_folder = folder
+            self.load_directory()
+            
+            
+    def set_configuration_file(self):        
+        fname, extension = qw.QFileDialog.getOpenFileName(self,
+                                                          'Open {} configuration file'.format(self.model.model),
+                                                          self.model_folder,
+                                                          'Text file (*.txt);;Other (*.*)')
+        if fname:
+            self.configuration_path = fname
+            self.load_configuration_file(fname)
+            
+        
+    def load_depth_file(self, path):
+        
+        extension = path.rsplit('.', 1)[1].lower()
         
         if extension == 'nc':
-            self.load_netcdf(fname)
+            self.load_netcdf(path)
         elif extension == 'asc':
-            self.load_arcascii(fname)
+            self.load_arcascii(path)
         elif extension == 'txt':
-            self.zs = -np.loadtxt(fname)
+            self.zs = -np.loadtxt(path)
             
-        # TODO set cell size according to file if appropriate
+        # Set cell size according to file if appropriate
         #self.parameters['DX'].setValue()
         
         ny, nx = self.zs.shape
@@ -333,30 +374,41 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         self.plot.draw_bathymetry(self.zs)        
         
-    
-    
-    def set_results_clicked(self):
-        if self.directory:
-            directory = self.directory
-        else:
-            directory = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
         
-        # TODO make this relative to self.directory
-        self.results_directory = qw.QFileDialog.getExistingDirectory(self,
-                                                   'Select {} results directory'.format(self.model.model),
-                                                   directory)           
-        self.read_results()
+    def load_directory(self):
+        """
+        For loading everything possible when a new modelling directory is given
+        """
+        # If the inputs exists then load them
+        for check_path, function in [(self.configuration_path, self.load_configuration_file),
+                                     (self.depth_path, self.load_depth_file)]:
+            
+            path = os.path.join(self.model_folder, check_path)
+            # Check if the check_path is relative
+            if os.path.exists(path):
+                function(path)
+            # Check if the check_path is absolute        
+            elif os.path.exists(check_path):
+                function(check_path)
+            else:
+                # If the path isn't valid, don't continue
+                return  
+            
+        self.load_results()
         
-    
-    def set_directory(self):
-        if self.directory:
-            directory = self.directory
-        else:
-            directory = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-        
-        self.directory = qw.QFileDialog.getExistingDirectory(self,
-                                                             'Select {} directory'.format(self.model.model),
-                                                             directory)   
+
+    def load_configuration_file(self, path):
+        # Load parameters from input text file
+        loadedParameters = read_configuration_file(path)
+        # Run for the provided tab
+        for key, value in loadedParameters.items():
+            if key in self.parameters:
+                try:
+                    self.parameters[key].setValue(value)
+                except TypeError:
+                    print('parameter {} with value {} has unexpected type'.format(key, value))
+                    print(type(value), 'instead of type', type(self.parameters[key].value()))
+
  
     
     def load_arcascii(self, path):
@@ -408,9 +460,9 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # Set parameters
         for k, w in self.parameters.items():
             self.model.parameters[k] = w.value()            
-        self.model.parameters['RESULT_FOLDER'] = self.results_directory            
+        self.model.parameters['RESULT_FOLDER'] = self.results_folder            
         self.model.depth = -self.zs            
-        self.model.output_directory = self.directory
+        self.model.output_directory = self.model_folder
         
         # Output them
         self.model.write_config()
@@ -421,10 +473,23 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         if run: self.read_results()
         
         
-    def read_results(self):
+    def load_results(self):
+        # Check if there are any results and load them   
+        
+        folder = os.path.join(self.model_folder, self.results_folder)
+        # Check if the results path is relative
+        if not os.path.isdir(folder):
+            # Check if the results path is absolute
+            if os.path.isdir(self.results_folder):
+                folder = self.results_folder
+            else:
+                # If the folder isn't valid, don't try and load the results
+                return             
+
         #TODO generalise this function so it can load other types       
         # Get a list of the results
-        files = glob(self.results_directory + '/eta_*')
+        files = glob(os.path.join(folder, 'eta_*'))
+        
         if not files: return
         # Sort the files by the number at the end of the file
         file_list = sorted(files, key=lambda name: int(name[-5:]))        
@@ -433,6 +498,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.wave_heights[self.timesteps[0]] = np.zeros_like(self.zs)
         
         # Load the remaining waves
+        # TODO parallelise this
         for i, (time, path) in enumerate(zip(self.timesteps[1:], file_list)):
             print('\rLoading output {} of {}'.format(i + 1, len(file_list)), end='')
             self.wave_heights[time] = np.loadtxt(path)

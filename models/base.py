@@ -10,7 +10,7 @@ from subprocess import Popen, PIPE
 from stat import S_IEXEC
 from matplotlib.widgets import Slider, Button, RadioButtons
 from pandas import read_table
-from tsunamis.utilities.io import load_config_file
+from tsunamis.utilities.io import read_configuration_file
 
 #from builtins import print as bprint
 #def print(*args, **kwargs):
@@ -73,7 +73,7 @@ class model:
         if not path: path = os.path.join(self.input_directory, self.input_file)
         if not os.path.exists(path): return
         
-        self.parameters = load_config_file(path)
+        self.parameters = read_configuration_file(path)
                         
                         
                         

@@ -10,7 +10,7 @@ from main_window import TsunamiWindow
 
     
     
-def run(path=r'C:\Users\Simon\OneDrive\Tsunamis\test2'):
+def run(nhwave=r'C:\Users\Simon\Desktop\test bathymetry'):
     
     # Written as a function to prevent things from getting into the console
     # namespace, as Spyder also runs in PyQt5   
@@ -22,7 +22,7 @@ def run(path=r'C:\Users\Simon\OneDrive\Tsunamis\test2'):
     #app = QtGui.QApplication.instance()
     
     # This needs to point to an argument to make it persistant
-    window = TsunamiWindow(path)
+    window = TsunamiWindow(nhwave)
     window.show()
     
     # Start Qt event loop unless running in interactive mode or using pyside
