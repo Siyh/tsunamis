@@ -59,45 +59,53 @@ class DictionaryCombo(qw.QComboBox):
         
         
 class DoubleSlider(qw.QSlider):
-    # Modifies a slider class to use doubles as opposed to ints
-    #https://stackoverflow.com/questions/42820380/use-float-for-qslider
-    # create our our signal that we can connect to if necessary
-    doubleValueChanged = pyqtSignal(float)
+    """
+    Extends a QSlider to use doubles as opposed to ints, and 
+    limits the selectable intervals to the tick marks using setInterval
+    """
 
     def __init__(self, decimals=3, *args, **kargs):
         super(DoubleSlider, self).__init__( *args, **kargs)
-        self._multi = 10 ** decimals
-
-        self.valueChanged.connect(self.emitDoubleValueChanged)
-
-    def emitDoubleValueChanged(self):
-        value = float(super(DoubleSlider, self).value())/self._multi
-        self.doubleValueChanged.emit(value)
+        self._min = 0
+        self._max = 99
+        self.interval = 1
         
     def setValue(self, value):
-        super(DoubleSlider, self).setValue(int(value * self._multi))
+        index = round((value - self._min) / self.interval)
+        return super(DoubleSlider, self).setValue(index)
         
     def value(self):
-        return float(super(DoubleSlider, self).value()) / self._multi
+        return self.index * self.interval + self._min
+    
+    @property
+    def index(self):
+        return super(DoubleSlider, self).value()
+    
+    def setIndex(self, index):
+        return super(DoubleSlider, self).setValue(index)
 
     def setMinimum(self, value):
-        return super(DoubleSlider, self).setMinimum(value * self._multi)
+        self._min = value
+        self._range_adjusted()
 
     def setMaximum(self, value):
-        return super(DoubleSlider, self).setMaximum(value * self._multi)
-
-    def setSingleStep(self, value):
-        return super(DoubleSlider, self).setSingleStep(value * self._multi)
-
-    def singleStep(self):
-        return float(super(DoubleSlider, self).singleStep()) / self._multi
+        self._max = value
+        self._range_adjusted()
     
-    def setTickInterval(self, value):
-        return super(DoubleSlider, self).setTickInterval(value * self._multi)
+    def setInterval(self, value):
+        # To avoid division by zero
+        if not value:
+            raise ValueError('Interval of zero specified')
+        self.interval = value
+        self._range_adjusted()
+        
+    def _range_adjusted(self):
+        number_of_steps = int((self._max - self._min) / self.interval)
+        super(DoubleSlider, self).setMaximum(number_of_steps)
+        
+        #TODO try to maintain previous position
+        self.setIndex(0)
 
-    
-        
-        
 
 class WidgetMethods:
     
@@ -181,6 +189,9 @@ class WidgetMethods:
                 
         if value is not None:
             widget.setValue(value)
+            
+        if hasattr(widget, 'setKeyboardTracking'):
+            widget.setKeyboardTracking(False)
                 
         # Remember the widget acoording the model variable name, so the values
         # can be looked up when the model inputs are output

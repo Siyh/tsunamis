@@ -111,9 +111,10 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.timestepper.setMaximum(300)
         self.add_input('Output time start', 'PLOT_START', 0.0, function=self.plot_start_changed)
         self.timestepper.setMinimum(0.0)
-        self.add_input('Output interval', 'PLOT_INTV', 10.0, function=self.plot_interval_changed)
-        self.timestepper.setSingleStep(10.0)
-        self.timestepper.setTickInterval(10.0)
+        output_interval = self.add_input('Output interval', 'PLOT_INTV', 10.0,
+                                         function=self.plot_interval_changed)
+        output_interval.setMinimum(1E-5)
+        self.timestepper.setInterval(10.0)
         self.recalculate_timesteps()
         
         self.add_input('Screen output interval', 'SCREEN_INTV', 10.0)
@@ -195,8 +196,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         
     def plot_interval_changed(self, value):
-        self.timestepper.setSingleStep(value)
-        self.timestepper.setTickInterval(value)
+        self.timestepper.setInterval(value)
         self.recalculate_timesteps()
         
         
@@ -254,11 +254,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             
     
     def next_timestep(self):
-        self.timestepper.setValue(self.timestep + self.timestepper.singleStep())
+        self.timestepper.setIndex(self.timestepper.index + 1)
         
         
     def previous_timestep(self):
-        self.timestepper.setValue(self.timestep - self.timestepper.singleStep())
+        self.timestepper.setIndex(self.timestepper.index - 1)
         
         
     def restart_timestepper(self):
