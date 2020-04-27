@@ -8,7 +8,8 @@ from traitsui.api import View, Item
 from mayavi.core.ui.api import MayaviScene, MlabSceneModel, SceneEditor
 from mayavi import mlab
 from tvtk.api import tvtk
-
+import numpy as np
+from mayavi.core.lut_manager import pylab_luts
 
 # First, and before importing any Enthought packages, set the ETS_TOOLKIT
 # environment variable to qt4, to tell Traits that we will use Qt.
@@ -94,33 +95,12 @@ class MayaviQWidget(QtGui.QWidget):
         self.wave_vectors = None
         
         
-        
     def set_location(self, xs, ys):
         self.xs = xs.T
-        self.ys = ys.T
-        
-        
-    def hide_wave_height(self):
-        if self.wave_height is not None:
-            self.wave_height.visible = False
-            self.wave_height = None
-        
-    def draw_wave_height(self, heights):
-        # If the wave hasn't already been drawn, update it
-        if self.wave_height is None:
-            self.wave_height = mlab.surf(self.xs,
-                                         self.ys,
-                                         heights.T,
-                                         warp_scale=1,
-                                         colormap='jet',
-                                         figure=self.figure)
-        # Otherwise update the existing wave
-        else:
-            self.wave_height.mlab_source.scalars = heights.T
-        
+        self.ys = ys.T    
    
         
-    def draw_bathymetry(self, bathymetry):
+    def draw_bathymetry(self, bathymetry, colormap='gist_earth',):
         if not self.figure: return
         
         # If the bathymetry has already been drawn, update the current one
@@ -134,7 +114,7 @@ class MayaviQWidget(QtGui.QWidget):
                                         self.ys,
                                         bathymetry.T,
                                         warp_scale=1,
-                                        colormap='gist_earth',
+                                        colormap=colormap,
                                         figure=self.figure) 
                     
             self.contours = mlab.contour_surf(self.xs,
@@ -146,7 +126,7 @@ class MayaviQWidget(QtGui.QWidget):
                                               figure=self.figure) 
             
             mlab.orientation_axes(figure=self.figure)
-
+            
                 
         # self.make_scale_bar()
         
@@ -161,6 +141,65 @@ class MayaviQWidget(QtGui.QWidget):
                    
         #     if self.show_vectors:
         #         self.make_vector_plot()
+        
+        
+    def hide_wave_height(self):
+        if self.wave_height is not None:
+            self.wave_height.visible = False
+            self.wave_height = None
+            
+        
+    def draw_wave_height(self, heights, colormap='jet'):
+        # If the wave hasn't already been drawn, update it
+        if self.wave_height is None:
+            self.wave_height = mlab.surf(self.xs,
+                                         self.ys,
+                                         heights.T,
+                                         warp_scale=1,
+                                         colormap=colormap,
+                                         figure=self.figure,
+                                         opacity=0.7)
+            mlab.colorbar(self.wave_height,
+                          title='Wave amplitude',
+                          orientation='vertical')
+        # Otherwise update the existing wave
+        else:
+            self.wave_height.mlab_source.scalars = heights.T
+            
+        # Need to map this to whatever Mayavi uses
+        self.wave_lut = (pylab_luts[colormap] * 255).astype(int)
+        self.centre_colormap()
+        
+        
+                
+    def centre_colormap(self):
+        # The lut is a 255x4 array, with the columns representing RGBA
+        # (red, green, blue, alpha) coded with integers going from 0 to 255.
+                        
+        data = self.wave_height.mlab_source.scalars
+        maxd = np.max(data)
+        mind = np.min(data)
+        #Data range
+        dran = maxd - mind
+        
+        #If the data range is zero return
+        if not dran: return
+        
+        #Proportion of the data range at which the centred value lies
+        zdp = abs(mind) / dran
+        
+        #index equal portion of distance along colormap
+        cmzi = int(round(zdp * 255))
+        #linspace from zero to 128, with number of points matching portion to side of zero
+        topi = np.around(np.linspace(0, 127, cmzi))
+        #and for other side
+        boti = np.around(np.linspace(128, 254, 255 - cmzi))
+        #convert these linspaces to ints
+ 
+        #and map the new lut from these    
+        lut = self.wave_lut[np.hstack([topi, boti]).astype(int)]   
+        self.wave_height.module_manager.scalar_lut_manager.lut.table = lut
+        
         
         
 if __name__ == '__main__':

@@ -506,6 +506,9 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         self.display_wave_height_changed()
         
+
+        
+        
         
         
 if __name__ == '__main__':
