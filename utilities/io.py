@@ -1,6 +1,10 @@
 # Functions for IO to Tsunami GUI
 # Simon Libby and Marcus Wild 2020
 
+import numpy as np
+from multiprocessing import Pool
+
+
 
 def read_configuration_file(path):     
     parameters = {}
@@ -32,6 +36,14 @@ def read_configuration_file(path):
     return parameters
 
 
-                
-                
-    
+def read_results(target, timesteps, file_list):          
+    """
+    Read grids of numbers in parallel         
+    """
+    n = len(file_list)
+    with Pool() as pool:        
+        for i, (time, result) in enumerate(zip(timesteps,
+                                               pool.imap(np.loadtxt, file_list))):
+           print('\rLoading result {} of {}'.format(i + 1, n), end='')
+           target[time] = result
+        print()

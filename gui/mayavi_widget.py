@@ -90,43 +90,55 @@ class MayaviQWidget(QtGui.QWidget):
         
         self.visualization.scene.add_actor(self.timestep_label)
         
+        self.bathymetry = None
         self.wave_height = None
         self.wave_max = None
         self.wave_vectors = None
         
+        self.vertical_exaggeration = 1
+        
         
     def set_location(self, xs, ys):
         self.xs = xs.T
-        self.ys = ys.T    
+        self.ys = ys.T
+        for plot in [self.bathymetry,
+                     self.wave_height,
+                     self.wave_max,
+                     self.wave_vectors]:
+            if plot is not None:
+                plot.mlab_source.reset(x=self.xs, y=self.ys)
    
         
     def draw_bathymetry(self, bathymetry, colormap='gist_earth',):
         if not self.figure: return
         
-        # If the bathymetry has already been drawn, update the current one
-        if hasattr(self, 'bathymetry'):
-            self.bathymetry.mlab_source.scalars = bathymetry.T
-            self.contours.mlab_source.scalars = bathymetry.T
-        
-        # Otherwise draw it for the first time
-        else:
+        # If the bathymetry hasn't yet been plotted, do so
+        if self.bathymetry is None:
             self.bathymetry = mlab.surf(self.xs,
                                         self.ys,
                                         bathymetry.T,
-                                        warp_scale=1,
+                                        warp_scale=self.vertical_exaggeration,
                                         colormap=colormap,
                                         figure=self.figure) 
-                    
-            self.contours = mlab.contour_surf(self.xs,
-                                              self.ys,
-                                              bathymetry.T,
-                                              contours=[0],
-                                              warp_scale=1,
-                                              color=(0, 0, 0),
-                                              figure=self.figure) 
             
+            # Add a countour to mark the coastline
+            self.coastline = mlab.contour_surf(self.xs,
+                                               self.ys,
+                                               bathymetry.T,
+                                               contours=[0],
+                                               warp_scale=self.vertical_exaggeration,
+                                               color=(0, 0, 0),
+                                               figure=self.figure) 
+            
+            # Add an orientation axis            
+            #self.visualization.scene.show_axes = True
             mlab.orientation_axes(figure=self.figure)
             
+            
+        #Otherwise update the current bathymetry
+        else:
+            self.bathymetry.mlab_source.scalars = bathymetry.T
+            self.coastline.mlab_source.scalars = bathymetry.T
                 
         # self.make_scale_bar()
         
@@ -145,7 +157,9 @@ class MayaviQWidget(QtGui.QWidget):
         
     def hide_wave_height(self):
         if self.wave_height is not None:
-            self.wave_height.visible = False
+            self.figure.children.remove(self.wave_height)
+            # Or there is a remove actor option in the scene methods
+            #self.wave_height.visible = False
             self.wave_height = None
             
         
@@ -155,7 +169,7 @@ class MayaviQWidget(QtGui.QWidget):
             self.wave_height = mlab.surf(self.xs,
                                          self.ys,
                                          heights.T,
-                                         warp_scale=1,
+                                         warp_scale=self.vertical_exaggeration,
                                          colormap=colormap,
                                          figure=self.figure,
                                          opacity=0.7)
@@ -199,6 +213,18 @@ class MayaviQWidget(QtGui.QWidget):
         #and map the new lut from these    
         lut = self.wave_lut[np.hstack([topi, boti]).astype(int)]   
         self.wave_height.module_manager.scalar_lut_manager.lut.table = lut
+        
+        
+    def set_vertical_exaggeration(self, exaggeration):
+        self.vertical_exaggeration = exaggeration
+        
+        for plot in [self.bathymetry,
+                     self.wave_height,
+                     self.wave_max,
+                     self.wave_vectors]:
+            if plot is not None:
+                plot.mlab_source.trait_set(warp_scale=exaggeration)
+                
         
         
         

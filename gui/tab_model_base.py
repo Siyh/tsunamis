@@ -10,9 +10,10 @@ from PIL import Image
 import datetime
 from glob import glob
 
+
 from mayavi_widget import MayaviQWidget, mlab
 from common import WidgetMethods, build_wms_url, DoubleSlider
-from tsunamis.utilities.io import read_configuration_file
+from tsunamis.utilities.io import read_configuration_file, read_results
 
 class TabModelBase(qw.QSplitter, WidgetMethods):
     
@@ -55,7 +56,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         steppersplit.addWidget(plot_buttons)
         steppersplit.addWidget(self.timestepper)
         plot_controls.setLayout(steppersplit)
-        display_options = self.create_input_group('Display options',
+        plot_options = self.create_input_group('Plot options',
                                                   main_layout=False)
         self.display_wave_height = self.add_input('Wave height', value=True,
                                                   function=self.display_wave_height_changed)
@@ -64,9 +65,17 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.display_wave_vectors = self.add_input('Wave vectors', value=False,
                                                    function=self.display_wave_vectors_changed)
         
+        display_options = self.create_input_group('Display options',
+                                                  main_layout=False)
+        self.vertical_exaggeration = self.add_input('Vertical exaggeration', value=10,
+                                                    function=self.plot.set_vertical_exaggeration)
+        self.plot.set_vertical_exaggeration(10)
+
+        
         stepper_buttons = qw.QHBoxLayout()
         stepper_buttons.setAlignment(Qt.AlignRight)
         plot_control_layout = qw.QHBoxLayout()
+        plot_control_layout.addWidget(plot_options)
         plot_control_layout.addWidget(display_options)
         plot_control_layout.addLayout(stepper_buttons)
         plot_buttons.setLayout(plot_control_layout)
@@ -148,9 +157,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.make_grid_coords()
         
         # Make dummy zs
-        self.zs = (self.ys - self.ys.max()) / 2
+        self.zs = (self.ys - self.ys.max()) / 2        
         
-        self.plot.set_location(self.xs, self.ys)
         self.plot.draw_bathymetry(self.zs)
         
         if model_folder:
@@ -282,6 +290,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.y1 = self.y0 + dy * self.parameters['Nglob'].value()
         self.xs, self.ys = np.meshgrid(np.arange(self.x0, self.x1, dx),
                                        np.arange(self.x0, self.y1, dy))
+        self.plot.set_location(self.xs, self.ys)
 
         
     def download_bathymetry(self):
@@ -498,11 +507,12 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.wave_heights[self.timesteps[0]] = np.zeros_like(self.zs)
         
         # Load the remaining waves
-        # TODO parallelise this
-        for i, (time, path) in enumerate(zip(self.timesteps[1:], file_list)):
-            print('\rLoading output {} of {}'.format(i + 1, len(file_list)), end='')
-            self.wave_heights[time] = np.loadtxt(path)
-        print()
+        read_results(self.wave_heights, self.timesteps[1:], file_list)
+
+        # for i, (time, path) in enumerate(zip(self.timesteps[1:], file_list)):
+        #     print('\rLoading output {} of {}'.format(i + 1, len(file_list)), end='')
+        #     self.wave_heights[time] = np.loadtxt(path)
+        # print()
         
         self.display_wave_height_changed()
         
