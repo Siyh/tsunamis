@@ -13,11 +13,7 @@ class TabNHWAVE(TabModelBase):
     def __init__(self, parent, initial_directory):
         self.model = nhwave_config()
         
-        super().__init__(parent, initial_directory)
-        
-        
-        
-
+        super().__init__(parent)
         
         #=====================================================================
         # Add nhwave specific inputs
@@ -52,7 +48,9 @@ class TabNHWAVE(TabModelBase):
         self.add_input('PhiBed', 'PhiBed', 23.0)
         self.add_input('Use rheology', 'RHEOLOGY_ON', False)
         self.add_input('Yield stress', 'Yield_Stress', 10.0)
-        self.add_input('Plastic viscosity', 'Plastic_Visc', 0.0)
+        self.add_input('Plastic viscosity', 'Plastic_Visc', 0.0)       
+        self.landside_volume = qw.QLabel()
+        self.add_input('Landslide Volume', widget=self.landside_volume, function=False)
         self.recalculate_landslide()
         
         self.create_input_group('Boundary')
@@ -172,6 +170,9 @@ class TabNHWAVE(TabModelBase):
         self.add_input('number of probes', 'NSTAT', 0)
         self.add_input('probe start time', 'PLOT_INTV_STAT', 10.0)
         
+        
+        self._set_initial_directory(initial_directory)
+        
     
     def vector_output_changed(self, _):
         # TODO why isn't this working
@@ -188,6 +189,7 @@ class TabNHWAVE(TabModelBase):
         
     def recalculate_landslide(self):
         """Function to generate the bathymetry with landslide"""  
+        if self.refresh_pause: return 
         #TODO add an option for subtractive as well as additive landslides
         
         #Rigid landslide 'lumpiness' parameter
@@ -198,7 +200,7 @@ class TabNHWAVE(TabModelBase):
         sina0 = np.sin(alpha0)
         coss0 = np.cos(np.radians(self.pv('SlopeAngle')))   
         
-        v = 2.0 * np.arccosh(1.0 / e)
+        v = 2 * np.arccosh(1 / e)
         kb = v / self.pv('SlideL')
         kw = v / self.pv('SlideW')
         ut = self.pv('SlideUt')
@@ -206,30 +208,31 @@ class TabNHWAVE(TabModelBase):
         #Time to terminal velocity        
         t0 = ut / a0
         #Distance of landslide travel before terminal velocity
-        s0 = ut ** 2 / a0
-        
+        s0 = ut ** 2 / a0        
         st = s0 * np.log(np.cosh(self.timestep / t0)) * coss0
         
         x = self.pv('SlideX0')
         y = self.pv('SlideY0')
-        if not (self.x0 < x < self.x1) or not (self.y0 < y < self.y1):
+        if not (self.x0 <= x <= self.x1) or not (self.y0 <= y <= self.y1):
             print(self.x0, x, self.x1)
-            print('Landslide out of grid bounds')
-        lsx = x + st * cosa0 + self.xs[0, 0]
-        lsy = y + st * sina0 + self.ys[0, 0]
+            print('Landslide centre out of grid bounds')
+        lsx = x + st * cosa0 + self.x0
+        lsy = y + st * sina0 + self.y0
         
         xsmlsx = self.xs - lsx
         ysmlsy = self.ys - lsy
-        xt = xsmlsx * cosa0 + ysmlsy * sina0
-        yt = -xsmlsx * sina0 + ysmlsy * cosa0
-        zt = self.pv('SlideT') / (1 - e) * (1 / np.cosh(kb * xt) / np.cosh(kw * yt) - e)
+        xt = ((ysmlsy * sina0 + xsmlsx * cosa0) * kb).clip(min=-100, max=100)
+        yt = ((ysmlsy * cosa0 - xsmlsx * sina0) * kw).clip(min=-100, max=100)
+        zt = self.pv('SlideT') / (1 - e) * (1 / np.cosh(xt) / np.cosh(yt) - e)
         blob = zt.clip(min=0)
-        vol_est = np.sum(blob * self.pv('DX') * self.pv('DY')) / 1E9
-        self.vol_est = '%i' % vol_est if vol_est > 10 else '%.1f' % vol_est
         
         self.plot.draw_bathymetry(self.zs + blob)
         
+        vol_est = np.sum(blob * self.pv('DX') * self.pv('DY')) / 1E9
+        vol_est_str = '%i' % vol_est if vol_est > 10 else '%.1f' % vol_est        
+        self.landside_volume.setText(vol_est_str)
 
+        
 
 
 if __name__ == '__main__':

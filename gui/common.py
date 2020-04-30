@@ -57,6 +57,8 @@ class DictionaryCombo(qw.QComboBox):
 
         self.setCurrentIndex(i)
         
+    
+        
         
 class DoubleSlider(qw.QSlider):
     """
@@ -132,6 +134,8 @@ class WidgetMethods:
         if model_varb_name is specified, the variable will be added to the list
         that will be exported for the mode.
         
+        Setting function to False will stop the widget being linked to the
+        function of the group.       
 
         Parameters
         ----------
@@ -167,6 +171,7 @@ class WidgetMethods:
         if widget is None:            
             if isinstance(value, bool):
                 widget = qw.QCheckBox()
+                widget.valueChanged = widget.stateChanged
                 widget.setValue = widget.setChecked
                 widget.value = widget.isChecked
             elif isinstance(value, int):
@@ -180,6 +185,7 @@ class WidgetMethods:
                 widget.assign_content(value)
                 # So the value gets set to the default below
                 value = default
+                widget.valueChanged = widget.currentIndexChanged
             elif isinstance(value, str):
                 widget = qw.QLineEdit()                
                 widget.setValue = widget.setText
@@ -203,14 +209,14 @@ class WidgetMethods:
         hbox.addWidget(widget)        
         self._current_input_group.addLayout(hbox)
         # Link it to a function if desired
-        if hasattr(widget, 'valueChanged'):
-            if function is None:
-                if self._current_input_group_function is not None:
-                    widget.valueChanged.connect(self._current_input_group_function)
-            else:
-                # The lamda function means the called function will be passed
-                # the new value of the widget when it changes
-                widget.valueChanged.connect(lambda: function(widget.value()))
+        #if hasattr(widget, 'valueChanged'):
+        if function is None:
+            if self._current_input_group_function is not None:
+                widget.valueChanged.connect(self._current_input_group_function)
+        elif function:
+            # The lamda function means the called function will be passed
+            # the new value of the widget when it changes
+            widget.valueChanged.connect(lambda: function(widget.value()))
             
         return widget
         

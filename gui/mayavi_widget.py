@@ -94,6 +94,9 @@ class MayaviQWidget(QtGui.QWidget):
         self.wave_height = None
         self.wave_max = None
         self.wave_vectors = None
+        # Dictionaries to store the colorbar and luts
+        self.cbs = {}
+        self.luts = {}
         
         self.vertical_exaggeration = 1
         
@@ -132,65 +135,88 @@ class MayaviQWidget(QtGui.QWidget):
             
             # Add an orientation axis            
             #self.visualization.scene.show_axes = True
-            mlab.orientation_axes(figure=self.figure)
-            
+            mlab.orientation_axes(figure=self.figure)            
             
         #Otherwise update the current bathymetry
         else:
             self.bathymetry.mlab_source.scalars = bathymetry.T
             self.coastline.mlab_source.scalars = bathymetry.T
                 
-        # self.make_scale_bar()
         
-        #if np.any(depth_data):
-            ###### generates errors
-            #mlab.axes(self.dplot)#, xlabel='X', ylabel='Y', zlabel='Elevation')
-                    
-        # if self.show_waves and self.have_results:
-        #     self.make_wave_plot(self.eta[self.tstep])            
-                                        
-        #     #self.figure.on_mouse_pick(self.picker_callback)
-                   
-        #     if self.show_vectors:
-        #         self.make_vector_plot()
+    
+            
         
+    def show_wave_height(self, heights, colormap='jet'):       
+        self.wave_height = self.show_plot(self.wave_height, heights, colormap, 'Wave amplitude (m)')
+        
+        self.centre_colormap(self.wave_height)
         
     def hide_wave_height(self):
-        if self.wave_height is not None:
-            self.figure.children.remove(self.wave_height)
-            # Or there is a remove actor option in the scene methods
-            #self.wave_height.visible = False
-            self.wave_height = None
+        self.hide_plot(self.wave_height)
+            
+    def show_wave_max(self, heights, colormap='jet'):       
+        self.wave_max = self.show_plot(self.wave_max, heights, colormap, 'Max wave amplitude (m)')  
+        
+    def hide_wave_max(self):
+        self.hide_plot(self.wave_max)
+        
+    def hide_wave_vectors(self):
+        return
+        self.hide_plot(self.wave_vectors)
             
         
-    def draw_wave_height(self, heights, colormap='jet'):
-        # If the wave hasn't already been drawn, update it
-        if self.wave_height is None:
-            self.wave_height = mlab.surf(self.xs,
-                                         self.ys,
-                                         heights.T,
-                                         warp_scale=self.vertical_exaggeration,
-                                         colormap=colormap,
-                                         figure=self.figure,
-                                         opacity=0.7)
-            mlab.colorbar(self.wave_height,
-                          title='Wave amplitude',
-                          orientation='vertical')
-        # Otherwise update the existing wave
+    def show_plot(self, plot, heights, colormap, label):       
+        
+        # If the wave hasn't already been drawn, do so
+        if plot is None:
+            plot = mlab.surf(self.xs,
+                                self.ys,
+                                heights.T,
+                                warp_scale=self.vertical_exaggeration,
+                                colormap=colormap,
+                                figure=self.figure,
+                                opacity=0.7)
+            
+            cb = mlab.colorbar(plot,
+                               title=label,
+                               orientation='vertical')
+            
+            cb.scalar_bar.unconstrained_font_size = True
+            cb.title_text_property.font_size = 20
+            cb.label_text_property.font_size = 20
+            cb.label_text_property.bold = False            
+            
+            self.cbs[plot] = cb
+            self.luts[plot] = (pylab_luts[colormap] * 255).astype(int)            
+            
+        # Otherwise update the existing wave if it hasn't been hidden
+        elif plot.visible:
+            plot.mlab_source.scalars = heights.T
+            
+        # Otherwise just make it visible again
         else:
-            self.wave_height.mlab_source.scalars = heights.T
+            plot.visible = True
+            plot.cb.visible = True
             
-        # Need to map this to whatever Mayavi uses
-        self.wave_lut = (pylab_luts[colormap] * 255).astype(int)
-        self.centre_colormap()
+        return plot
         
+        
+    def hide_plot(self, plot):
+        if plot is not None:
+            plot.visible = False
+            self.cbs[plot].visible = False
+            
+            
+    def show_wave_vectors(self): 
+        pass
+            
         
                 
-    def centre_colormap(self):
+    def centre_colormap(self, plot):
         # The lut is a 255x4 array, with the columns representing RGBA
         # (red, green, blue, alpha) coded with integers going from 0 to 255.
                         
-        data = self.wave_height.mlab_source.scalars
+        data = plot.mlab_source.scalars
         maxd = np.max(data)
         mind = np.min(data)
         #Data range
@@ -211,8 +237,8 @@ class MayaviQWidget(QtGui.QWidget):
         #convert these linspaces to ints
  
         #and map the new lut from these    
-        lut = self.wave_lut[np.hstack([topi, boti]).astype(int)]   
-        self.wave_height.module_manager.scalar_lut_manager.lut.table = lut
+        lut = self.luts[plot][np.hstack([topi, boti]).astype(int)]   
+        plot.module_manager.scalar_lut_manager.lut.table = lut
         
         
     def set_vertical_exaggeration(self, exaggeration):

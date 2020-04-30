@@ -3,6 +3,7 @@
 
 from PyQt5 import QtWidgets as qw
 from PyQt5 import QtGui, QtCore
+from mayavi import mlab
 
 from tab_map import TabMap
 from tab_nhwave import TabNHWAVE
@@ -84,6 +85,8 @@ class TsunamiWindow(qw.QMainWindow):
     def closeEvent(self, event):
         # Save the window config
         self.settings.setValue('geometry', self.saveGeometry())
+        # Close the mayavi instances
+        mlab.close(all=True)
         print('Tsunami window closed')
         qw.QApplication.quit()        
 

@@ -36,7 +36,7 @@ def read_configuration_file(path):
     return parameters
 
 
-def read_results(target, timesteps, file_list):          
+def read_results(target, timesteps, file_list, result_type):          
     """
     Read grids of numbers in parallel         
     """
@@ -44,6 +44,6 @@ def read_results(target, timesteps, file_list):
     with Pool() as pool:        
         for i, (time, result) in enumerate(zip(timesteps,
                                                pool.imap(np.loadtxt, file_list))):
-           print('\rLoading result {} of {}'.format(i + 1, n), end='')
+           print('\rLoading {} {} of {}'.format(result_type, i + 1, n), end='')
            target[time] = result
         print()

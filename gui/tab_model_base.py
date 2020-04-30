@@ -17,7 +17,7 @@ from tsunamis.utilities.io import read_configuration_file, read_results
 
 class TabModelBase(qw.QSplitter, WidgetMethods):
     
-    def __init__(self, parent, model_folder=''):
+    def __init__(self, parent):
         super().__init__(parent)
         
         self.results_folder = 'results'
@@ -157,34 +157,45 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.make_grid_coords()
         
         # Make dummy zs
-        self.zs = (self.ys - self.ys.max()) / 2        
+        self.zs = (self.ys - self.ys.max()) / 20
         
         self.plot.draw_bathymetry(self.zs)
         
-        if model_folder:
-            self.model_folder = model_folder
+        self.refresh_pause = False
+        
+         
+    def _set_initial_directory(self, path):
+        """
+        To be run after the initialisation of the nhwave and funwave tabs
+        """
+        if path:
+            self.model_folder = path
             self.load_directory()
         else:
             # TODO this is windows specific
             self.model_folder = os.path.join(os.environ['USERPROFILE'],
                                              'Desktop',
-                                             self.model.model) 
-        
+                                             self.model.model)
    
         
-    def display_wave_height_changed(self):
-        if self.display_wave_height.isChecked():
-            self.plot.draw_wave_height(self.wave_heights[self.timestep])
+    def display_wave_height_changed(self, value):
+        if value:
+            self.plot.show_wave_height(self.wave_heights[self.timestep])
         else:
             self.plot.hide_wave_height()
         
-    def display_wave_max_changed(self):
-        if self.display_wave_max.isChecked():
-            pass
+    def display_wave_max_changed(self, value):
+        if value:
+            self.plot.show_wave_max(self.wave_wave_maxs[self.timestep])
+        else:
+            self.plot.hide_wave_max()
         
-    def display_wave_vectors_changed(self):
-        if self.display_wave_vectors.isChecked():
-            pass
+    def display_wave_vectors_changed(self, value):
+        if value:
+            self.plot.show_wave_vectors(self.wave_us[self.timestep],
+                                        self.wave_vs[self.timestep])
+        else:
+            self.plot.hide_wave_vectors()
             
         
     def recalculate_timesteps(self):
@@ -233,11 +244,12 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         time = datetime.timedelta(seconds=self.timestep)
         self.plot.timestep_label.input = str(time)
         
+        # TODO make this dependant on which wave type is being displayed
         wave = self.wave_heights[self.timestep]
         if wave is None:
             self.plot.hide_wave_height()
         else:
-            self.plot.draw_wave_height(wave)
+            self.plot.show_wave_height(wave)
         
         
     def play_pause_clicked(self):
@@ -289,7 +301,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.x1 = self.x0 + dx * self.parameters['Mglob'].value()
         self.y1 = self.y0 + dy * self.parameters['Nglob'].value()
         self.xs, self.ys = np.meshgrid(np.arange(self.x0, self.x1, dx),
-                                       np.arange(self.x0, self.y1, dy))
+                                       np.arange(self.y0, self.y1, dy))
         self.plot.set_location(self.xs, self.ys)
 
         
@@ -405,10 +417,15 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             
         self.load_results()
         
+        # Refresh the plot
+        self.timestep_changed()
+        
 
     def load_configuration_file(self, path):
         # Load parameters from input text file
         loadedParameters = read_configuration_file(path)
+        
+        self.refresh_pause = True
         # Run for the provided tab
         for key, value in loadedParameters.items():
             if key in self.parameters:
@@ -418,6 +435,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                     print('parameter {} with value {} has unexpected type'.format(key, value))
                     print(type(value), 'instead of type', type(self.parameters[key].value()))
 
+        self.refresh_pause = False
  
     
     def load_arcascii(self, path):
@@ -479,7 +497,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # And run
         run = self.model.run()
         
-        if run: self.read_results()
+        if run: self.load_results()
         
         
     def load_results(self):
@@ -495,30 +513,29 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                 # If the folder isn't valid, don't try and load the results
                 return             
 
-        #TODO generalise this function so it can load other types       
-        # Get a list of the results
-        files = glob(os.path.join(folder, 'eta_*'))
+        for result, extension, result_type in [(self.wave_heights, 'eta', 'wave height result'),
+                                               (self.wave_maxs, 'hmax', 'max wave height result'),
+                                               (self.wave_us, 'u', 'wave vector u component'),
+                                               (self.wave_vs, 'v', 'wave vector v component')]:
+            # Get a list of the results
+            files = glob(os.path.join(folder, extension + '_*'))            
+            if not files: continue
         
-        if not files: return
-        # Sort the files by the number at the end of the file
-        file_list = sorted(files, key=lambda name: int(name[-5:]))        
+            # Sort the files by the number at the end of the file
+            file_list = sorted(files, key=lambda name: int(name[-5:]))        
+            
+            # No result for the first timestep
+            result[self.timesteps[0]] = np.zeros_like(self.zs)
+            
+            # Load the remaining results
+            read_results(result, self.timesteps[1:], file_list, result_type)
+            
         
-        # No wave for the first timestep
-        self.wave_heights[self.timesteps[0]] = np.zeros_like(self.zs)
-        
-        # Load the remaining waves
-        read_results(self.wave_heights, self.timesteps[1:], file_list)
+        # Refresh any plots that are showing
+        self.display_wave_height_changed(self.display_wave_height.value())
+        self.display_wave_max_changed(self.display_wave_max.value())
+        self.display_wave_vectors_changed(self.display_wave_vectors.value())
 
-        # for i, (time, path) in enumerate(zip(self.timesteps[1:], file_list)):
-        #     print('\rLoading output {} of {}'.format(i + 1, len(file_list)), end='')
-        #     self.wave_heights[time] = np.loadtxt(path)
-        # print()
-        
-        self.display_wave_height_changed()
-        
-
-        
-        
         
         
 if __name__ == '__main__':

@@ -10,10 +10,10 @@ class TabFUNWAVE(TabModelBase):
     def __init__(self, parent, initial_directory):
         self.model = funwave_config()
         
-        super().__init__(parent, initial_directory)
+        super().__init__(parent)
         
         
-        
+        self._set_initial_directory(initial_directory)
         
         
         
