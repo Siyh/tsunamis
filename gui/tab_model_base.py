@@ -2,7 +2,7 @@
 # Simon Libby 2020
 
 from PyQt5 import QtWidgets as qw
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSlot
 import numpy as np
 import os
 import requests
@@ -12,13 +12,14 @@ from glob import glob
 
 
 from mayavi_widget import MayaviQWidget, mlab
-from common import WidgetMethods, build_wms_url, DoubleSlider
+from common import WidgetMethods, build_wms_url, DoubleSlider, ResultReader
 from tsunamis.utilities.io import read_configuration_file, read_results
 
 class TabModelBase(qw.QSplitter, WidgetMethods):
     
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         
         self.results_folder = 'results'
         self.configuration_path = 'input.txt'
@@ -511,7 +512,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                 folder = self.results_folder
             else:
                 # If the folder isn't valid, don't try and load the results
-                return             
+                return      
+            
+        
+        reader = ResultReader()
+        reader.statusMessage.connect(self.handleStatusMessage)
 
         for result, extension, result_type in [(self.wave_heights, 'eta', 'wave height result'),
                                                (self.wave_maxs, 'hmax', 'max wave height result'),
@@ -528,15 +533,26 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             result[self.timesteps[0]] = np.zeros_like(self.zs)
             
             # Load the remaining results
-            read_results(result, self.timesteps[1:], file_list, result_type)
+            #read_results(result, self.timesteps[1:], file_list, result_type)
             
+            for timestep, path in zip(self.timesteps[1:], file_list):
+                reader.add_task(result, timestep, path)
+        
+        reader.start()
         
         # Refresh any plots that are showing
         self.display_wave_height_changed(self.display_wave_height.value())
         self.display_wave_max_changed(self.display_wave_max.value())
         self.display_wave_vectors_changed(self.display_wave_vectors.value())
 
-        
+
+
+
+    @pyqtSlot(object)
+    def handleStatusMessage(self, message):
+        self.parent.statusBar.showMessage(message, 2000)
+
+
         
 if __name__ == '__main__':
     from run_gui import run

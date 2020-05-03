@@ -47,3 +47,6 @@ def read_results(target, timesteps, file_list, result_type):
            print('\rLoading {} {} of {}'.format(result_type, i + 1, n), end='')
            target[time] = result
         print()
+        
+        
+        

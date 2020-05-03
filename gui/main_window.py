@@ -57,6 +57,7 @@ class TsunamiWindow(qw.QMainWindow):
         self.statusBar = qw.QStatusBar()
         self.setStatusBar(self.statusBar)
         
+        
         self.setCentralWidget(self.tabs)   
         
         

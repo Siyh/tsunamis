@@ -2,7 +2,8 @@
 # Simon Libby 2020
 
 from PyQt5 import QtWidgets as qw
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QThread
+import numpy as np
 
 
 def label_to_attribute(label):
@@ -251,7 +252,31 @@ def build_wms_url(epsg='4326',
     
         
         
+class ResultReader(QThread):
+    statusMessage = pyqtSignal(object)
+
+    def __init__(self):
+        QThread.__init__(self)
+        self.targets = []
+        self.paths = []
+        self.keys = []
         
+
+    # def __del__(self):
+    #     self.wait()
+    
+    
+    def add_task(self, target, key, path):
+        self.targets.append(target)
+        self.keys.append(key)
+        self.paths.append(path)
+        
+
+    def run(self):
+        for target, key, path in zip(self.targets, self.keys, self.paths):
+            target[key] = np.loadtxt(path)
+            self.statusMessage.emit('Loading: ' + path)
+       
         
         
         
