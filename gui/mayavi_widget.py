@@ -142,6 +142,7 @@ class MayaviQWidget(QtGui.QWidget):
             self.bathymetry.mlab_source.scalars = bathymetry.T
             self.coastline.mlab_source.scalars = bathymetry.T
                 
+        pass
         
     
             
@@ -196,7 +197,7 @@ class MayaviQWidget(QtGui.QWidget):
         # Otherwise just make it visible again
         else:
             plot.visible = True
-            plot.cb.visible = True
+            self.cbs[plot].visible = True
             
         return plot
         
@@ -249,7 +250,8 @@ class MayaviQWidget(QtGui.QWidget):
                      self.wave_max,
                      self.wave_vectors]:
             if plot is not None:
-                plot.mlab_source.trait_set(warp_scale=exaggeration)
+                warp_filter = plot.mlab_source.m_data.children[0]
+                warp_filter.filter.scale_factor = exaggeration
                 
         
         
