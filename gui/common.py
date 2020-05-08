@@ -2,8 +2,9 @@
 # Simon Libby 2020
 
 from PyQt5 import QtWidgets as qw
-from PyQt5.QtCore import pyqtSignal, QThread
+from PyQt5.QtCore import pyqtSignal, QThread, QPropertyAnimation, Qt, QParallelAnimationGroup, QAbstractAnimation
 import numpy as np
+import time
 
 
 def label_to_attribute(label):
@@ -124,6 +125,23 @@ class WidgetMethods:
             self.input_layout.addWidget(gb)
         self._current_input_group_function = function
         return gb
+    
+    
+    def start_dropdown(self, title, function=None, main_layout=True):
+        """
+        Creates a vertical list upon which to place buttons and labelled widgets.
+        If a function is given, it is called whenever one of the input group changes.
+        """
+        self._current_dropdown = Spoiler(title=title)
+        self._current_input_group = qw.QVBoxLayout()        
+        self._current_input_group_function = function
+        if main_layout:
+            self.input_layout.addWidget(self._current_dropdown)
+        
+    
+    def finish_dropdown(self):
+        self._current_dropdown.setContentLayout(self._current_input_group)   
+        
     
     
     def add_input(self, label, model_varb_name='', value=None,
@@ -253,7 +271,7 @@ def build_wms_url(epsg='4326',
         
         
 class ResultReader(QThread):
-    statusMessage = pyqtSignal(object)
+    progress = pyqtSignal(float, str)
 
     def __init__(self):
         QThread.__init__(self)
@@ -273,10 +291,96 @@ class ResultReader(QThread):
         
 
     def run(self):
-        for target, key, path in zip(self.targets, self.keys, self.paths):
+        n = len(self.targets)
+        for i, (target, key, path) in enumerate(zip(self.targets,
+                                                    self.keys,
+                                                    self.paths)):
+            # Load the data
             target[key] = np.loadtxt(path)
-            self.statusMessage.emit('Loading: ' + path)
+            
+            # Report the progress
+            self.progress.emit(i / n, 'Loading: ' + path)
+            
+        self.progress.emit(1, '{} Results loaded.'.format(n))        
+        time.sleep(2)
+        self.progress.emit(0, '')
+        
        
+class Spoiler(qw.QWidget):
+    def __init__(self, parent=None, title='', animationDuration=200):
+        """
+        References:
+            # Adapted from c++ version
+            http://stackoverflow.com/questions/32476006/how-to-make-an-expandable-collapsable-section-widget-in-qt
+        """
+        super(Spoiler, self).__init__(parent=parent)
+
+        self.animationDuration = animationDuration
+        self.toggleAnimation = QParallelAnimationGroup()
+        self.contentArea = qw.QScrollArea()
+        self.headerLine = qw.QFrame()
+        self.toggleButton = qw.QToolButton()
+        self.mainLayout = qw.QGridLayout()
+
+        toggleButton = self.toggleButton
+        toggleButton.setStyleSheet("QToolButton { border: none; }")
+        toggleButton.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        toggleButton.setArrowType(Qt.RightArrow)
+        toggleButton.setText(str(title))
+        toggleButton.setCheckable(True)
+        toggleButton.setChecked(False)
+
+        headerLine = self.headerLine
+        headerLine.setFrameShape(qw.QFrame.HLine)
+        headerLine.setFrameShadow(qw.QFrame.Sunken)
+        headerLine.setSizePolicy(qw.QSizePolicy.Expanding, qw.QSizePolicy.Maximum)
+
+        self.contentArea.setStyleSheet("QScrollArea { background-color: white; border: none; }")
+        self.contentArea.setSizePolicy(qw.QSizePolicy.Expanding, qw.QSizePolicy.Fixed)
+        # start out collapsed
+        self.contentArea.setMaximumHeight(0)
+        self.contentArea.setMinimumHeight(0)
+        # let the entire widget grow and shrink with its content
+        toggleAnimation = self.toggleAnimation
+        toggleAnimation.addAnimation(QPropertyAnimation(self, b"minimumHeight"))
+        toggleAnimation.addAnimation(QPropertyAnimation(self, b"maximumHeight"))
+        toggleAnimation.addAnimation(QPropertyAnimation(self.contentArea, b"maximumHeight"))
+        # don't waste space
+        mainLayout = self.mainLayout
+        mainLayout.setVerticalSpacing(0)
+        mainLayout.setContentsMargins(0, 0, 0, 0)
+        row = 0
+        mainLayout.addWidget(self.toggleButton, row, 0, 1, 1, Qt.AlignLeft)
+        mainLayout.addWidget(self.headerLine, row, 2, 1, 1)
+        row += 1
+        mainLayout.addWidget(self.contentArea, row, 0, 1, 3)
+        self.setLayout(self.mainLayout)
+
+        def start_animation(checked):
+            arrow_type = Qt.DownArrow if checked else Qt.RightArrow
+            direction = QAbstractAnimation.Forward if checked else QAbstractAnimation.Backward
+            toggleButton.setArrowType(arrow_type)
+            self.toggleAnimation.setDirection(direction)
+            self.toggleAnimation.start()
+
+        self.toggleButton.clicked.connect(start_animation)
+        
+
+    def setContentLayout(self, contentLayout):
+        # Not sure if this is equivalent to self.contentArea.destroy()
+        self.contentArea.destroy()
+        self.contentArea.setLayout(contentLayout)
+        collapsedHeight = self.sizeHint().height() - self.contentArea.maximumHeight()
+        contentHeight = contentLayout.sizeHint().height()
+        for i in range(self.toggleAnimation.animationCount() - 1):
+            spoilerAnimation = self.toggleAnimation.animationAt(i)
+            spoilerAnimation.setDuration(self.animationDuration)
+            spoilerAnimation.setStartValue(collapsedHeight)
+            spoilerAnimation.setEndValue(collapsedHeight + contentHeight)
+        contentAnimation = self.toggleAnimation.animationAt(self.toggleAnimation.animationCount() - 1)
+        contentAnimation.setDuration(self.animationDuration)
+        contentAnimation.setStartValue(0)
+        contentAnimation.setEndValue(contentHeight)
         
         
         

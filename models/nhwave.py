@@ -75,6 +75,7 @@ class config(model):
                 DX=float(res), DY=float(res))
         self.x0 = x0
         self.y0 = y0
+        
        
     def gen_ls(self, time):
         """Function to generate the landslide thicknesses""" 
@@ -107,10 +108,21 @@ class config(model):
         zt = float(self.SlideT) / (1. - e) * (1. / 
                 np.cosh(kb * xt) / np.cosh(kw * yt) - e)
         return zt.clip(min=0)
+    
                 
-    def nhw_to_funw(self, fwo, funw_crs=None, nhw_crs=None, interpolate=True,
-            nx0=None, ny0=None, fx0=None, fy0=None, insert=False,
-            result_to_convert=None, method='linear', landslide=True):
+    def nhw_to_funw(self,
+                    fwo,
+                    funw_crs=None,
+                    nhw_crs=None,
+                    interpolate=True,
+                    nx0=None,
+                    ny0=None,
+                    fx0=None,
+                    fy0=None,
+                    insert=False,
+                    result_to_convert=None,
+                    method='linear',
+                    landslide=True):
         """
         Function to convert from nhwave output to funwave input.
         fwo = funwave object to convert the results for.

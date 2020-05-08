@@ -55,6 +55,9 @@ class TsunamiWindow(qw.QMainWindow):
 
         
         self.statusBar = qw.QStatusBar()
+        self.progressBar = qw.QProgressBar()
+        self.progressBar.setMaximum(100)
+        self.statusBar.addPermanentWidget(self.progressBar)
         self.setStatusBar(self.statusBar)
         
         

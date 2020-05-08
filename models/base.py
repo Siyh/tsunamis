@@ -119,7 +119,7 @@ class model:
                 elif isinstance(v, int):
                     vs = str(v)
                 elif isinstance(v, float):
-                    vs = '{0:.10f}'.format(v)
+                    vs = str(v)#'{0:.10f}'.format(v)
                 else:
                     vs = v
                 f.write(k + ' = ' + vs + '\n') # faster than .format()?
@@ -140,7 +140,7 @@ class model:
         
         n = int(self.parameters['PX']) * int(self.parameters['PY'])
         
-        command = 'mpirun -np {} {}'.format(n, self.target_executable_path)
+        command = 'mpirun -np {} "{}"'.format(n, self.target_executable_path)
         
         # If this is running on Windows change the command appropriately
         if os.name == 'nt':
@@ -148,9 +148,10 @@ class model:
             input_path = output_directory.replace('\\', '/')
         else:
             input_path = output_directory
+            
          
-        # print(self.model + ' initiated with command:')
-        # print(command + '\nin:\n' + input_path)
+        print(self.model + ' initiated with command:')
+        print(command + '\nin:\n' + input_path)
         print(self.model + 'output:')
         
         p = Popen(command, shell=True, cwd=input_path, stdout=PIPE)

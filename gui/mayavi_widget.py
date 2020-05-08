@@ -58,7 +58,6 @@ class MayaviQWidget(QtGui.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.visualization = Visualization()           
-        self.visualization.draw_bathymetry = self.draw_bathymetry
         # If you want to debug, beware that you need to remove the Qt
         # input hook.
         #QtCore.pyqtRemoveInputHook()
@@ -94,6 +93,7 @@ class MayaviQWidget(QtGui.QWidget):
         self.wave_height = None
         self.wave_max = None
         self.wave_vectors = None
+        self.landslide = None
         # Dictionaries to store the colorbar and luts
         self.cbs = {}
         self.luts = {}
@@ -107,19 +107,23 @@ class MayaviQWidget(QtGui.QWidget):
         for plot in [self.bathymetry,
                      self.wave_height,
                      self.wave_max,
-                     self.wave_vectors]:
+                     self.wave_vectors,
+                     self.landslide]:
             if plot is not None:
                 plot.mlab_source.reset(x=self.xs, y=self.ys)
    
         
-    def draw_bathymetry(self, bathymetry, colormap='gist_earth',):
+    def show_bathymetry(self, bathymetry, colormap='gist_earth'):
         if not self.figure: return
+        self.bathymetry_data = bathymetry.T
+        
         
         # If the bathymetry hasn't yet been plotted, do so
         if self.bathymetry is None:
+            
             self.bathymetry = mlab.surf(self.xs,
                                         self.ys,
-                                        bathymetry.T,
+                                        self.bathymetry_data,
                                         warp_scale=self.vertical_exaggeration,
                                         colormap=colormap,
                                         figure=self.figure) 
@@ -127,30 +131,34 @@ class MayaviQWidget(QtGui.QWidget):
             # Add a countour to mark the coastline
             self.coastline = mlab.contour_surf(self.xs,
                                                self.ys,
-                                               bathymetry.T,
+                                               self.bathymetry_data,
                                                contours=[0],
                                                warp_scale=self.vertical_exaggeration,
                                                color=(0, 0, 0),
                                                figure=self.figure) 
             
             # Add an orientation axis            
-            #self.visualization.scene.show_axes = True
             mlab.orientation_axes(figure=self.figure)            
-            
-        #Otherwise update the current bathymetry
-        else:
-            self.bathymetry.mlab_source.scalars = bathymetry.T
-            self.coastline.mlab_source.scalars = bathymetry.T
-                
-        pass
         
-    
+        #Otherwise update the current bathymetry
+        elif self.bathymetry.visible:
+            self.bathymetry.mlab_source.scalars = self.bathymetry_data
+            self.coastline.mlab_source.scalars = self.bathymetry_data       
+        else:
+            self.bathymetry.visible = True
+            self.coastline.visible = True
             
+            
+    def hide_bathymetry(self):
+        self.hide_plot(self.bathymetry)
+        self.hide_plot(self.coastline)        
+
         
     def show_wave_height(self, heights, colormap='jet'):       
         self.wave_height = self.show_plot(self.wave_height, heights, colormap, 'Wave amplitude (m)')
         
-        self.centre_colormap(self.wave_height)
+        if self.wave_height is not None:
+            self.centre_colormap(self.wave_height)
         
     def hide_wave_height(self):
         self.hide_plot(self.wave_height)
@@ -161,22 +169,52 @@ class MayaviQWidget(QtGui.QWidget):
     def hide_wave_max(self):
         self.hide_plot(self.wave_max)
         
-    def hide_wave_vectors(self):
-        return
-        self.hide_plot(self.wave_vectors)
+        
+    def show_landslide(self, depth):
+        if depth is None:
+            if self.landslide is not None:
+                self.hide_plot(self.landslide)
+            return            
+        
+        zs = -depth.T        
+        mask = zs < self.bathymetry_data + 0.1
+        
+        if self.landslide is None:
+            self.landslide = mlab.surf(self.xs,
+                                       self.ys,
+                                       zs,
+                                       warp_scale=self.vertical_exaggeration,
+                                       colormap='Reds',
+                                       figure=self.figure,
+                                       opacity=0.7,
+                                       mask=mask)
+            
+        elif self.landslide.visible:
+            self.landslide.mlab_source.reset(scalars=zs, mask=mask)            
+        else:
+            self.landslide.visible = True
+            
+
+    def hide_landslide(self):
+        self.landslide.visible = False
             
         
-    def show_plot(self, plot, heights, colormap, label):       
-        
+    def show_plot(self, plot, zs, colormap, label):  
+        if zs is None:
+            if plot is not None:
+                self.hide_plot(plot)
+            
         # If the wave hasn't already been drawn, do so
-        if plot is None:
+        elif plot is None:
             plot = mlab.surf(self.xs,
-                                self.ys,
-                                heights.T,
-                                warp_scale=self.vertical_exaggeration,
-                                colormap=colormap,
-                                figure=self.figure,
-                                opacity=0.7)
+                             self.ys,
+                             zs.T,
+                             warp_scale=self.vertical_exaggeration,
+                             colormap=colormap,
+                             figure=self.figure,
+                             opacity=0.7)
+            
+            self.luts[plot] = (pylab_luts[colormap] * 255).astype(int) 
             
             cb = mlab.colorbar(plot,
                                title=label,
@@ -188,11 +226,11 @@ class MayaviQWidget(QtGui.QWidget):
             cb.label_text_property.bold = False            
             
             self.cbs[plot] = cb
-            self.luts[plot] = (pylab_luts[colormap] * 255).astype(int)            
+                       
             
         # Otherwise update the existing wave if it hasn't been hidden
         elif plot.visible:
-            plot.mlab_source.scalars = heights.T
+            plot.mlab_source.scalars = zs.T
             
         # Otherwise just make it visible again
         else:
@@ -205,13 +243,16 @@ class MayaviQWidget(QtGui.QWidget):
     def hide_plot(self, plot):
         if plot is not None:
             plot.visible = False
-            self.cbs[plot].visible = False
+            if plot in self.cbs:
+                self.cbs[plot].visible = False
             
             
     def show_wave_vectors(self): 
         pass
             
-        
+    def hide_wave_vectors(self):
+        return
+        self.hide_plot(self.wave_vectors)
                 
     def centre_colormap(self, plot):
         # The lut is a 255x4 array, with the columns representing RGBA

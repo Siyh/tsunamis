@@ -13,9 +13,19 @@ from glob import glob
 
 from mayavi_widget import MayaviQWidget, mlab
 from common import WidgetMethods, build_wms_url, DoubleSlider, ResultReader
-from tsunamis.utilities.io import read_configuration_file, read_results
+from tsunamis.utilities.io import read_configuration_file
 
-class TabModelBase(qw.QSplitter, WidgetMethods):
+class TabModelBase(qw.QSplitter, WidgetMethods):    
+
+    # Result types and descriptions to be loaded
+    result_types = {'eta':'wave height result',
+                    'hmax':'max wave height result',
+                    'Us':'wave vector u component',
+                    'Vs':'wave vector v component',
+                    'Ws':'wave vector w component',
+                    'Ps':'?'}
+                         
+    
     
     def __init__(self, parent):
         super().__init__(parent)
@@ -25,6 +35,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.configuration_path = 'input.txt'
         self.depth_path = 'depth.txt'
         self.parameters = {}
+        self.results = dict.fromkeys(self.result_types, None) 
         
         # Make all the components
         config_input_widget = qw.QWidget()
@@ -57,8 +68,10 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         steppersplit.addWidget(plot_buttons)
         steppersplit.addWidget(self.timestepper)
         plot_controls.setLayout(steppersplit)
-        plot_options = self.create_input_group('Plot options',
+        self.plot_options = self.create_input_group('Plot options',
                                                   main_layout=False)
+        self.display_bathymetry = self.add_input('Bathymetry', value=True,
+                                                  function=self.display_bathymetry_changed)
         self.display_wave_height = self.add_input('Wave height', value=True,
                                                   function=self.display_wave_height_changed)
         self.display_wave_max = self.add_input('Maximum wave height', value=False,
@@ -76,7 +89,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         stepper_buttons = qw.QHBoxLayout()
         stepper_buttons.setAlignment(Qt.AlignRight)
         plot_control_layout = qw.QHBoxLayout()
-        plot_control_layout.addWidget(plot_options)
+        plot_control_layout.addWidget(self.plot_options)
         plot_control_layout.addWidget(display_options)
         plot_control_layout.addLayout(stepper_buttons)
         plot_buttons.setLayout(plot_control_layout)
@@ -106,6 +119,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         #TODO set tooltips using .setToolTip
         self.create_input_group('General')        
         self.add_button('Run ' + self.model.model, self.run_model_clicked)  
+        self.add_button('Write model inputs', self.write_model_inputs)
         
         self.add_button('Set model folder', self.set_model_folder) 
         self.add_button('Set results folder', self.set_results_folder)      
@@ -160,9 +174,13 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # Make dummy zs
         self.zs = (self.ys - self.ys.max()) / 20
         
-        self.plot.draw_bathymetry(self.zs)
+        self.display_bathymetry_changed()
+
         
         self.refresh_pause = False
+        self.refresh_functions = [self.display_wave_height_changed,
+                                  self.display_wave_max_changed,
+                                  self.display_wave_vectors_changed]
         
          
     def _set_initial_directory(self, path):
@@ -179,22 +197,35 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                                              self.model.model)
    
         
-    def display_wave_height_changed(self, value):
+    def refresh_plots(self):
+        for f in self.refresh_functions: f()
+        
+    def display_bathymetry_changed(self, value=None):
+        if value is None: value = self.display_bathymetry.value()
         if value:
-            self.plot.show_wave_height(self.wave_heights[self.timestep])
+            self.plot.show_bathymetry(self.zs)
+        else:
+            self.plot.hide_bathymetry()
+        
+    def display_wave_height_changed(self, value=None):
+        if value is None: value = self.display_wave_height.value()
+        if value:
+            self.plot.show_wave_height(self.results['eta'][self.timestep])
         else:
             self.plot.hide_wave_height()
         
-    def display_wave_max_changed(self, value):
+    def display_wave_max_changed(self, value=None):
+        if value is None: value = self.display_wave_max.value()
         if value:
-            self.plot.show_wave_max(self.wave_wave_maxs[self.timestep])
+            self.plot.show_wave_max(self.results['hmax'][self.timestep])
         else:
             self.plot.hide_wave_max()
         
-    def display_wave_vectors_changed(self, value):
+    def display_wave_vectors_changed(self, value=None):
+        if value is None: value = self.display_wave_vectors.value()
         if value:
-            self.plot.show_wave_vectors(self.wave_us[self.timestep],
-                                        self.wave_vs[self.timestep])
+            self.plot.show_wave_vectors(self.results['Us'][self.timestep],
+                                        self.results['Vs'][self.timestep])
         else:
             self.plot.hide_wave_vectors()
             
@@ -205,14 +236,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                                    self.pv('TOTAL_TIME') + self.pv('PLOT_INTV') / 2,
                                    self.pv('PLOT_INTV'))
         
-        # Create a dictionary to hold the results
-        empty = {t: None for t in self.timesteps}
-        
-        # Copy this dictionary for each value, probably a better way of doing this
-        self.wave_heights = {**empty}
-        self.wave_maxs = {**empty}
-        self.wave_us = {**empty}
-        self.wave_vs = {**empty}
+        # Done on existing keys in case this ever changes
+        for result in self.results:
+            # Create an empty dictionary to hold the results
+            self.results[result] = {t: None for t in self.timesteps}
+            
         
         
     def total_time_changed(self, value):
@@ -243,18 +271,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
     
     def timestep_changed(self):
         time = datetime.timedelta(seconds=self.timestep)
-        self.plot.timestep_label.input = str(time)
-        
-        # TODO make this dependant on which wave type is being displayed
-        wave = self.wave_heights[self.timestep]
-        if wave is None:
-            self.plot.hide_wave_height()
-        else:
-            self.plot.show_wave_height(wave)
+        self.plot.timestep_label.input = str(time)        
+        self.refresh_plots()
         
         
     def play_pause_clicked(self):
-        #TODO make this initiate the animate
         if self.playing:
             self.playing = False
             self.play_pause_button.setText('|>')
@@ -394,7 +415,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         self.make_grid_coords()
         
-        self.plot.draw_bathymetry(self.zs)        
+        self.display_bathymetry_changed() 
         
         
     def load_directory(self):
@@ -485,20 +506,25 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
     
     
     def run_model_clicked(self):
-        # Set parameters
-        for k, w in self.parameters.items():
-            self.model.parameters[k] = w.value()            
-        self.model.parameters['RESULT_FOLDER'] = self.results_folder            
-        self.model.depth = -self.zs            
-        self.model.output_directory = self.model_folder
-        
-        # Output them
-        self.model.write_config()
+        # Ouputs inputs
+        self.write_model_inputs()
         
         # And run
         run = self.model.run()
         
         if run: self.load_results()
+        
+    
+    def write_model_inputs(self):
+        # Set parameters
+        for k, w in self.parameters.items():
+            self.model.parameters[k] = w.value()            
+        self.model.parameters['RESULT_FOLDER'] = self.results_folder + '/'
+        self.model.depth = -self.zs            
+        self.model.output_directory = self.model_folder
+        
+        # Output them
+        self.model.write_config()
         
         
     def load_results(self):
@@ -516,40 +542,38 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             
         
         reader = ResultReader()
-        reader.statusMessage.connect(self.handleStatusMessage)
+        reader.progress.connect(self.progress)
 
-        for result, extension, result_type in [(self.wave_heights, 'eta', 'wave height result'),
-                                               (self.wave_maxs, 'hmax', 'max wave height result'),
-                                               (self.wave_us, 'u', 'wave vector u component'),
-                                               (self.wave_vs, 'v', 'wave vector v component')]:
+
+        for label, record in self.results.items():
             # Get a list of the results
-            files = glob(os.path.join(folder, extension + '_*'))            
+            files = glob(os.path.join(folder, label + '_*'))            
             if not files: continue
+            print('loading {} {} files'.format(len(files), label))
         
             # Sort the files by the number at the end of the file
             file_list = sorted(files, key=lambda name: int(name[-5:]))        
             
             # No result for the first timestep
-            result[self.timesteps[0]] = np.zeros_like(self.zs)
-            
-            # Load the remaining results
-            #read_results(result, self.timesteps[1:], file_list, result_type)
+            record[self.timesteps[0]] = np.zeros_like(self.zs)
+                       
+            # DEBUG OPTION
+            file_list = file_list[:5]
             
             for timestep, path in zip(self.timesteps[1:], file_list):
-                reader.add_task(result, timestep, path)
+                reader.add_task(record, timestep, path)
         
         reader.start()
         
         # Refresh any plots that are showing
-        self.display_wave_height_changed(self.display_wave_height.value())
-        self.display_wave_max_changed(self.display_wave_max.value())
-        self.display_wave_vectors_changed(self.display_wave_vectors.value())
+        self.refresh_plots()
 
 
 
 
-    @pyqtSlot(object)
-    def handleStatusMessage(self, message):
+    @pyqtSlot(float, str)
+    def progress(self, fraction, message):
+        self.parent.progressBar.setValue(round(fraction * 100))
         self.parent.statusBar.showMessage(message, 2000)
 
 
