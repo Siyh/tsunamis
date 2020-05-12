@@ -136,7 +136,7 @@ class config(model):
                 Defaults to the maximum number.
         method = method of interpolation (see scipy griddata).
         """
-        ###### implement getting x0s and y0s from surface inputs
+        #TODO implement getting x0s and y0s from surface inputs
         #Get the number (with preceeding zeros) of the result to convert
         if result_to_convert:
             result_to_convert = str(result_to_convert)
@@ -222,7 +222,6 @@ class config(model):
             #Get rid of land elevation on wave data, except where wave over land
             if f == 'eta':
                 zs[(zs > 0) * (zs > self.depth)] = 0
-            ############## is this bit needed?
                 
             #mask spikes
             ############################

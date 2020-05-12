@@ -65,8 +65,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.timestepper = DoubleSlider(orientation=Qt.Horizontal)
         self.timestepper.setTickPosition(qw.QSlider.TicksBelow)
         self.timestepper.valueChanged.connect(self.timestep_changed)
-        steppersplit.addWidget(plot_buttons)
         steppersplit.addWidget(self.timestepper)
+        steppersplit.addWidget(plot_buttons)        
         plot_controls.setLayout(steppersplit)
         self.plot_options = self.create_input_group('Plot options',
                                                   main_layout=False)
@@ -79,10 +79,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.display_wave_vectors = self.add_input('Wave vectors', value=False,
                                                    function=self.display_wave_vectors_changed)
         
-        display_options = self.create_input_group('Display options',
-                                                  main_layout=False)
+        self.misc_options = self.create_input_group('',
+                                                    main_layout=False)
         self.vertical_exaggeration = self.add_input('Vertical exaggeration', value=10,
                                                     function=self.plot.set_vertical_exaggeration)
+        
         self.plot.set_vertical_exaggeration(10)
 
         
@@ -90,7 +91,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         stepper_buttons.setAlignment(Qt.AlignRight)
         plot_control_layout = qw.QHBoxLayout()
         plot_control_layout.addWidget(self.plot_options)
-        plot_control_layout.addWidget(display_options)
+        plot_control_layout.addWidget(self.misc_options)
         plot_control_layout.addLayout(stepper_buttons)
         plot_buttons.setLayout(plot_control_layout)
         
@@ -440,7 +441,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.load_results()
         
         # Refresh the plot
-        self.timestep_changed()
+        # TODO might not be needed
+        #self.timestep_changed()
         
 
     def load_configuration_file(self, path):
@@ -516,15 +518,18 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
     
     def write_model_inputs(self):
+        self.set_model_inputs()        
+        # Output them
+        self.model.write_config()
+        
+        
+    def set_model_inputs(self):
         # Set parameters
         for k, w in self.parameters.items():
             self.model.parameters[k] = w.value()            
         self.model.parameters['RESULT_FOLDER'] = self.results_folder + '/'
         self.model.depth = -self.zs            
         self.model.output_directory = self.model_folder
-        
-        # Output them
-        self.model.write_config()
         
         
     def load_results(self):
@@ -558,15 +563,21 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             record[self.timesteps[0]] = np.zeros_like(self.zs)
                        
             # DEBUG OPTION
-            file_list = file_list[:5]
+            # file_list = file_list[:5]
             
             for timestep, path in zip(self.timesteps[1:], file_list):
                 reader.add_task(record, timestep, path)
         
         reader.start()
         
+        # Probably a better way to do this
+        if hasattr(self, 'recalculate_landslide'):
+            self.recalculate_landslide()
+        
         # Refresh any plots that are showing
         self.refresh_plots()
+        
+        
 
 
 

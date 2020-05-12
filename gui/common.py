@@ -7,6 +7,10 @@ import numpy as np
 import time
 
 
+def sigfigs(number, sigfigs=2):
+    # https://stackoverflow.com/questions/3410976/how-to-round-a-number-to-significant-figures-in-python
+    return round(number, -int(np.floor(np.log10(number))) + (sigfigs - 1))
+
 def label_to_attribute(label):
     """
     Converts a text string used for a labelling a button/input, and returns
@@ -70,16 +74,16 @@ class DoubleSlider(qw.QSlider):
 
     def __init__(self, decimals=3, *args, **kargs):
         super(DoubleSlider, self).__init__( *args, **kargs)
-        self._min = 0
-        self._max = 99
+        self.minIndex = 0
+        self.maxIndex = 99
         self.interval = 1
         
     def setValue(self, value):
-        index = round((value - self._min) / self.interval)
+        index = round((value - self.minIndex) / self.interval)
         return super(DoubleSlider, self).setValue(index)
         
     def value(self):
-        return self.index * self.interval + self._min
+        return self.index * self.interval + self.minIndex
     
     @property
     def index(self):
@@ -89,11 +93,11 @@ class DoubleSlider(qw.QSlider):
         return super(DoubleSlider, self).setValue(index)
 
     def setMinimum(self, value):
-        self._min = value
+        self.minIndex = value
         self._range_adjusted()
 
     def setMaximum(self, value):
-        self._max = value
+        self.maxIndex = value
         self._range_adjusted()
     
     def setInterval(self, value):
@@ -104,7 +108,7 @@ class DoubleSlider(qw.QSlider):
         self._range_adjusted()
         
     def _range_adjusted(self):
-        number_of_steps = int((self._max - self._min) / self.interval)
+        number_of_steps = int((self.maxIndex - self.minIndex) / self.interval)
         super(DoubleSlider, self).setMaximum(number_of_steps)
         
         #TODO try to maintain previous position
@@ -145,7 +149,7 @@ class WidgetMethods:
     
     
     def add_input(self, label, model_varb_name='', value=None,
-                  widget=None, default=None, function=None):  
+                  widget=None, default=None, function=None, layout=None):  
         """
         Labels a widget and adds it to the input group. The widget type
         depends on the value used unless a widget is specified. 
@@ -210,11 +214,12 @@ class WidgetMethods:
                 widget.setValue = widget.setText
                 widget.value = widget.text
             else:
-                raise Exception('Input widget type not recognised')
+                raise Exception('Input data type not recognised')
                 
         if value is not None:
             widget.setValue(value)
             
+        # Turn off calling valueChanged after every key press
         if hasattr(widget, 'setKeyboardTracking'):
             widget.setKeyboardTracking(False)
                 
@@ -226,7 +231,10 @@ class WidgetMethods:
         hbox = qw.QHBoxLayout()
         hbox.addWidget(qw.QLabel(label))
         hbox.addWidget(widget)        
-        self._current_input_group.addLayout(hbox)
+        
+        if layout is None: layout = self._current_input_group
+        layout.addLayout(hbox)
+        
         # Link it to a function if desired
         #if hasattr(widget, 'valueChanged'):
         if function is None:
@@ -246,7 +254,7 @@ class WidgetMethods:
         """
         button = qw.QPushButton(label)
         button.clicked.connect(function)
-        setattr(self, label.replace(' ', '_'), button)
+        # setattr(self, label.replace(' ', '_'), button)
         self._current_input_group.addWidget(button)
         
     
@@ -309,6 +317,7 @@ class ResultReader(QThread):
 class Spoiler(qw.QWidget):
     def __init__(self, parent=None, title='', animationDuration=200):
         """
+        Expandable list of widgets.
         References:
             # Adapted from c++ version
             http://stackoverflow.com/questions/32476006/how-to-make-an-expandable-collapsable-section-widget-in-qt

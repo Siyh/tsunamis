@@ -17,6 +17,21 @@ class TabFUNWAVE(TabModelBase):
         
         
         
+        self.create_input_group('Initial wave')      
+        
+        self.add_button('Set initial wave', self.set_initial_wave)
+
+        self.add_input('wave height', value='eta.txt')
+        self.add_input('wave u vector', value='u.txt')
+        self.add_input('wave v vector', value='v.txt')
+        
+        
+    
+        
+    def set_initial_wave(self, value=None):
+        
+        
+        
         
 if __name__ == '__main__':
     from run_gui import run

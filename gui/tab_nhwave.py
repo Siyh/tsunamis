@@ -6,6 +6,7 @@ import numpy as np
 
 from tab_model_base import TabModelBase
 from tsunamis.models.nhwave import config as nhwave_config
+from common import sigfigs
 
 
 class TabNHWAVE(TabModelBase):
@@ -30,10 +31,15 @@ class TabNHWAVE(TabModelBase):
         self.add_input('GRD_R', 'GRD_R', 1.1)
         
         self.create_input_group('Landslide Creator', self.recalculate_landslide)
-        self.add_input('Slide type', 'SlideType',
-                       {'deformable':'DEFORMABLE',
-                        'rigid (nhwave 2.0)':'RIGID',
-                        'rigid (nhwave 3.0)':'RIGID_3D'})
+        
+        #TODO use https://www.tutorialspoint.com/pyqt/pyqt_qstackedwidget.htm
+        # to make options option specific
+        
+        # Commented options are for the rigid landslide
+        # self.add_input('Slide type', 'SlideType',
+        #                {'deformable':'DEFORMABLE',
+        #                 'rigid (nhwave 2.0)':'RIGID',
+        #                 'rigid (nhwave 3.0)':'RIGID_3D'})
         self.add_input('Thickness', 'SlideT', 30.0)
         self.add_input('Length', 'SlideL', 200.0)
         self.add_input('Width', 'SlideW', 500.0)
@@ -42,33 +48,39 @@ class TabNHWAVE(TabModelBase):
         # TODO add option to make this relative
         self.add_input('X coordinate', 'SlideX0', 1000.0)
         self.add_input('Y coordinate', 'SlideY0', 1000.0)
-        self.add_input('Max speed?', 'SlideUt', 10.0)
-        self.add_input('Acceleration', 'SlideA0', 0.37)
-        self.add_input('Density', 'SlideDens', 2100.0)
-        self.add_input('Viscosity', 'SlideVisc', 0.00001)
-        self.add_input('Lambda', 'SlideLambda', 0.5)
-        self.add_input('Inital speed', 'SlideIniU', 0.0)
-        self.add_input('Cf_ul', 'Cf_ul', 0.02)
-        self.add_input('PhiInt', 'PhiInt', 41.0)
-        self.add_input('PhiBed', 'PhiBed', 23.0)
-        self.add_input('Use rheology', 'RHEOLOGY_ON', False)
-        self.add_input('Yield stress', 'Yield_Stress', 10.0)
-        self.add_input('Plastic viscosity', 'Plastic_Visc', 0.0)   
+        # self.add_input('Max speed?', 'SlideUt', 10.0)
+        # self.add_input('Acceleration', 'SlideA0', 0.37)
+        # self.add_input('Density', 'SlideDens', 2100.0)
+        # self.add_input('Viscosity', 'SlideVisc', 0.00001)
+        # self.add_input('Lambda', 'SlideLambda', 0.5)
+        # self.add_input('Inital speed', 'SlideIniU', 0.0)
+        # self.add_input('Cf_ul', 'Cf_ul', 0.02)
+        # self.add_input('PhiInt', 'PhiInt', 41.0)
+        # self.add_input('PhiBed', 'PhiBed', 23.0)
+        # self.add_input('Use rheology', 'RHEOLOGY_ON', False)
+        # self.add_input('Yield stress', 'Yield_Stress', 10.0)
+        # self.add_input('Plastic viscosity', 'Plastic_Visc', 0.0)   
+        
+        self.landslide_volume = qw.QLabel()
+        self.add_input('Landslide Volume', widget=self.landslide_volume, function=False)        
+        self.add_button('Output landslide thickness', self.output_landslide)
+        
+        
         self.create_input_group('Landslides')
         self.add_input('Slide thickness', 'SLIDE_FILE', 'SlideThickness.txt')
         self.add_input('Rheology option', 'RHEO_OPT', {'Viscous':'VISCOUS',
                                                        'Granular':'GRANULAR'})        
-        self.add_input('Slide Gamma', 'SLIDE_GAMMA', 1.0)
-        self.add_input('Slide', 'NON_HYDRO_SLD', True)
-        self.add_input('Slide', 'DISP_CORR_SLD', True)
-        self.add_input('Slide', 'REDU_GRAV_SLD', True)
-        self.add_input('Slide', 'NON_HYDRO_UP', True)
-        self.add_input('Slide', 'SLIDE_MINTHICK', 1E-4)
-        self.add_input('Slide', 'SLIDE_INIU', 1.9138)
-        self.add_input('Slide', 'SLIDE_INIV', 0.0)
-        self.add_input('Slide', 'SLIDE_INIW', -0.9793)
-        self.add_input('viscous slide density (kg/m^3)', 'SLIDE_DENSITY', 1760.0)
-        self.add_input('kinematic viscousity of viscous slide (m^2/s)', 'SLIDE_VISCOSITY', 0.5)
+        self.add_input('momentum distribution coefficient', 'SLIDE_GAMMA', 1.0)
+        self.add_input('use hydrostatic model?', 'NON_HYDRO_SLD', True)
+        self.add_input('dispersion correction in non-hydrostatic model', 'DISP_CORR_SLD', True)
+        self.add_input('reduced gravitation in non-hydrostatic model', 'REDU_GRAV_SLD', True)
+        self.add_input('non-hydrostatic from upper layer', 'NON_HYDRO_UP', True)
+        self.add_input('minimum slide thickness', 'SLIDE_MINTHICK', 1E-4)
+        self.add_input('initial velocity of slide in x', 'SLIDE_INIU', 0.0)
+        self.add_input('initial velocity of slide in y', 'SLIDE_INIV', 0.0)
+        self.add_input('initial velocity of slide in z', 'SLIDE_INIW', 0.0)
+        self.add_input('viscous slide density (kg/m\u00b3)', 'SLIDE_DENSITY', 1760.0)
+        self.add_input('kinematic viscosity of viscous slide (m\u00b2/s)', 'SLIDE_VISCOSITY', 0.5)
         self.add_input('pure grain density', 'GRAIN_DENSITY', 2600.0)
         self.add_input('sediment concentration', 'SLIDE_CONC', 0.475)
         self.add_input('internal friction angle A', 'PhiInt_A', 41.0)
@@ -76,17 +88,10 @@ class TabNHWAVE(TabModelBase):
         self.add_input('internal friction angle F', 'PhiInt_F', 32.0)
         self.add_input('bed friction angle F', 'PhiBed_F', 18.0)
         self.add_input('% of non-hydrostatic pressure', 'SLIDE_LAMBDA', 1.0)
-        
 
+    
         
-        
-        
-        self.landslide_volume = qw.QLabel()
-        self.add_input('Landslide Volume', widget=self.landslide_volume, function=False)
-        self.recalculate_landslide()
-        self.add_button('Output landslide thickness', self.output_landslide)  
-        
-        self.create_input_group('Boundary')
+        self.start_dropdown('Boundary')
         self.add_input('Period boundary condition X', 'PERIODIC_X', False)
         self.add_input('Period boundary condition Y', 'PERIODIC_Y', False)        
         self.add_input('External forcing', 'EXTERNAL_FORCING', False)
@@ -99,7 +104,8 @@ class TabNHWAVE(TabModelBase):
                                 'influx',
                                 'outflux (specified eta)',
                                 'bottom friction',
-                                'radiation bc'])                
+                                'radiation bc'])  
+        self.finish_dropdown()
                 
         self.start_dropdown('Sponge boundary')
         self.add_input('Sponge on', 'SPONGE_ON', False)
@@ -253,12 +259,47 @@ class TabNHWAVE(TabModelBase):
         
         
         
-        self._current_input_group = self.plot_options.layout()
         self.display_landslide = self.add_input('Landslide', value=True,
-                                                function=self.display_landslide_changed)
+                                                function=self.display_landslide_changed,
+                                                layout=self.plot_options.layout())        
+        self.recalculate_landslide()
+        
+        # Controls for sending the wave to FUNWAVE
+        misc = self.misc_options.layout()
+        self.final_wave = qw.QRadioButton('Final Wave')
+        self.final_wave.setChecked(True)
+        misc.addWidget(self.final_wave)
+
+        current_wave = qw.QRadioButton('Current Wave')
+        misc.addWidget(current_wave)
+        
+        button = qw.QPushButton('Send wave to FUNWAVE')
+        button.clicked.connect(self.send_wave_to_funwave)
+        misc.addWidget(button)
+        
         
         
         self._set_initial_directory(initial_directory)
+        
+        
+    def send_wave_to_funwave(self):
+        # Get index of the result to convert
+        if self.final_wave.isChecked():
+            result_to_convert = self.timestepper.maxIndex + 1
+        else:
+            result_to_convert = self.timestepper.index + 1
+        
+        # Set the model outputs
+        self.set_model_inputs()
+        funwave_tab = self.parent.tab_funwave
+        funwave_tab.set_model_inputs()
+        
+        # And convert
+        self.model.nhw_to_funw(fwo=funwave_tab.model,
+                               result_to_convert=result_to_convert)
+        
+        # And make the tab load the new wave
+        pass
         
     
     def vector_output_changed(self, _):
@@ -282,14 +323,22 @@ class TabNHWAVE(TabModelBase):
         if self.refresh_pause: return 
         #TODO add an option for subtractive as well as additive landslides
         
-        blob = self.generate_landslide_blob()
+        # For anything but rigid landslides, the start of the model run is
+        # the only time when the blob can be valid
+        self.restart_timestepper()
         
-        self.plot.show_landslide( - self.zs - blob)
+        blob = self.generate_landslide_blob()        
+        self.results['depth'][self.pv('PLOT_START')] = -self.zs - blob
+        self.display_landslide_changed()
         
         # Write the estimated volume of the landslide
-        vol_est = np.sum(blob * self.pv('DX') * self.pv('DY')) / 1E9
-        vol_est_str = '%i' % vol_est if vol_est > 10 else '%.1f' % vol_est        
-        self.landslide_volume.setText(vol_est_str)
+        vol_est = np.sum(blob * self.pv('DX') * self.pv('DY'))
+        if vol_est > 1000:
+            vol_str = str(sigfigs(vol_est) / 1E9) + ' km\u00b3'
+        else:
+            vol_str = str(sigfigs(vol_est)) + ' m\u00b3'
+            
+        self.landslide_volume.setText(vol_str)
         
         
     def output_landslide(self):
@@ -303,27 +352,29 @@ class TabNHWAVE(TabModelBase):
         
         alpha0 = np.radians(self.pv('SlideAngle'))
         cosa0 = np.cos(alpha0)
-        sina0 = np.sin(alpha0)
-        coss0 = np.cos(np.radians(self.pv('SlopeAngle')))   
+        sina0 = np.sin(alpha0)         
         
         v = 2 * np.arccosh(1 / e)
         kb = v / self.pv('SlideL')
         kw = v / self.pv('SlideW')
-        ut = self.pv('SlideUt')
-        a0 = self.pv('SlideA0')
-        #Time to terminal velocity        
-        t0 = ut / a0
-        #Distance of landslide travel before terminal velocity
-        s0 = ut ** 2 / a0        
-        st = s0 * np.log(np.cosh(self.timestep / t0)) * coss0
+        
+        # This commented out section for rigid landsides
+        # ut = self.pv('SlideUt')
+        # a0 = self.pv('SlideA0')
+        # #Time to terminal velocity        
+        # t0 = ut / a0
+        # #Distance of landslide travel before terminal velocity
+        # s0 = ut ** 2 / a0        
+        # coss0 = np.cos(np.radians(self.pv('SlopeAngle')))  
+        # st = s0 * np.log(np.cosh(self.timestep / t0)) * coss0
         
         x = self.pv('SlideX0')
         y = self.pv('SlideY0')
         if not (self.x0 <= x <= self.x1) or not (self.y0 <= y <= self.y1):
             print(self.x0, x, self.x1)
             print('Landslide centre out of grid bounds')
-        lsx = x + st * cosa0 + self.x0
-        lsy = y + st * sina0 + self.y0
+        lsx = x + self.x0 # + st * cosa0
+        lsy = y + self.y0 # + st * sina0
         
         xsmlsx = self.xs - lsx
         ysmlsy = self.ys - lsy

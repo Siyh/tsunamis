@@ -37,10 +37,9 @@ class Visualization(HasTraits):
     def update_plot(self):
         # This function is called when the view is opened. We don't
         # populate the scene when the view is not yet open, as some
-        # VTK features require a GLContext.
-        
-        # TODO this is causing errors
+        # VTK features require a GLContext.        
         pass
+    
     # the layout of the dialog screated
     view = View(Item('scene', editor=SceneEditor(scene_class=MayaviScene),
                      height=250, width=300, show_label=False),
