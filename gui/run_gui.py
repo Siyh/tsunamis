@@ -10,16 +10,17 @@ from main_window import TsunamiWindow
 
     
     
-def run(nhwave=r'C:\Users\Simon\Desktop\test bathymetry'):
+def run(nhwave=r'C:\Users\Simon\Desktop\test nhwave',
+        funwave=r'C:\Users\Simon\Desktop\test funwave'):
     
     # Written as a function to prevent things from getting into the console
     # namespace, as Spyder also runs in PyQt5   
-    app = qw.QApplication(sys.argv)
+    #app = qw.QApplication(sys.argv)
     
     # Don't create a new QApplication, it would unhook the Events
     # set by Traits on the existing QApplication. Simply use the
     # '.instance()' method to retrieve the existing one.
-    #app = QtGui.QApplication.instance()
+    app = QtGui.QApplication.instance()
     
     # This needs to point to an argument to make it persistant
     window = TsunamiWindow(nhwave)

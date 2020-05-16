@@ -2,7 +2,14 @@
 # Simon Libby 2020
 
 from PyQt5 import QtWidgets as qw
-from PyQt5.QtCore import pyqtSignal, QThread, QPropertyAnimation, Qt, QParallelAnimationGroup, QAbstractAnimation
+from PyQt5 import QtGui
+from PyQt5.QtCore import (pyqtSignal,
+                          QThread,
+                          QPropertyAnimation,
+                          Qt,
+                          QParallelAnimationGroup,
+                          QAbstractAnimation,
+                          QSize)
 import numpy as np
 import time
 
@@ -144,12 +151,21 @@ class WidgetMethods:
         
     
     def finish_dropdown(self):
+        # TODO change this to use a with statement
         self._current_dropdown.setContentLayout(self._current_input_group)   
         
     
     
-    def add_input(self, label, model_varb_name='', value=None,
-                  widget=None, default=None, function=None, layout=None):  
+    def add_input(self,
+                  label,
+                  model_varb_name='',
+                  value=None,
+                  widget=None,
+                  default=None,
+                  function=None,
+                  layout=None,
+                  dialogue_label='',        
+                  formats=''):  
         """
         Labels a widget and adds it to the input group. The widget type
         depends on the value used unless a widget is specified. 
@@ -177,6 +193,16 @@ class WidgetMethods:
             new value passed as an argument.
             If not provided, uses the one specified for the input group if that
             was provided.
+        layout : optional
+            layput to add the input to. Defaults to the current group
+        dialogue_label : str, optionl
+            if provided, adds a button that opens a dialogue box with this
+            label. The dialogue can open folders or files according to the 
+            provided format.
+        formats: str, optional
+            if provided, sets the button type to a file and sets the format
+            of the dialogue.
+            if 'txt', then 'Text file (*.txt);;Other (*.*)' is used.
 
         Raises
         ------
@@ -213,8 +239,14 @@ class WidgetMethods:
                 widget = qw.QLineEdit()                
                 widget.setValue = widget.setText
                 widget.value = widget.text
+                widget.valueChanged = widget.textChanged
             else:
                 raise Exception('Input data type not recognised')
+                
+        # Put a label next to the widget
+        hbox = qw.QHBoxLayout()
+        hbox.addWidget(qw.QLabel(label))
+        hbox.addWidget(widget)           
                 
         if value is not None:
             widget.setValue(value)
@@ -225,13 +257,9 @@ class WidgetMethods:
                 
         # Remember the widget acoording the model variable name, so the values
         # can be looked up when the model inputs are output
-        if model_varb_name: self.parameters[model_varb_name] = widget
-                
-        # Put a label next to the widget and add them to the input list
-        hbox = qw.QHBoxLayout()
-        hbox.addWidget(qw.QLabel(label))
-        hbox.addWidget(widget)        
+        if model_varb_name: self.parameters[model_varb_name] = widget 
         
+        # Add it to the input list if desired
         if layout is None: layout = self._current_input_group
         layout.addLayout(hbox)
         
@@ -245,18 +273,59 @@ class WidgetMethods:
             # the new value of the widget when it changes
             widget.valueChanged.connect(lambda: function(widget.value()))
             
+        # Add a button to open a file/folder directory if desired
+        if dialogue_label:
+            button = qw.QPushButton()  
+            hbox.addWidget(button)            
+            
+            if formats:            
+                icon = 'SP_FileIcon'
+                if formats == 'txt': formats = 'Text file (*.txt);;Other (*.*)'
+                f = lambda: self.file_dialogue(dialogue_label, formats, widget)                
+            else:
+                icon = 'SP_DirOpenIcon'
+                f = lambda: self.folder_dialogue(dialogue_label, widget) 
+            
+            self.set_button_icon(button, icon=icon)
+            button.clicked.connect(f)
+
         return widget
+    
+    
+    def folder_dialogue(self, label, target):
+        path = qw.QFileDialog.getExistingDirectory(self,
+                                                   label,
+                                                   self.model_folder.value())
+        if path:
+            target.setValue(path)
+        
+    def file_dialogue(self, label, formats, target):
+        path, extension = qw.QFileDialog.getOpenFileName(self,
+                                                         label,
+                                                         self.model_folder.value(),
+                                                         formats)
+        if path:
+            # TODO make relative
+            target.setValue(path)
         
         
-    def add_button(self, label, function):
+    def add_button(self, label=None, function=None, icon=None):
         """
         Adds a button to the vertical list
         """
         button = qw.QPushButton(label)
         button.clicked.connect(function)
-        # setattr(self, label.replace(' ', '_'), button)
+        if icon is not None:
+            self.set_button_icon(button, icon)
+            
         self._current_input_group.addWidget(button)
+        return button
+    
+    
+    def set_button_icon(self, button, icon='SP_DirOpenIcon'):
+        button.setIcon(self.style().standardIcon(getattr(qw.QStyle, icon)))
         
+            
     
 def build_wms_url(epsg='4326',
                   xmin='{XMIN}', xmax='{XMAX}',

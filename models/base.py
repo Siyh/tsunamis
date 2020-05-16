@@ -12,9 +12,6 @@ from matplotlib.widgets import Slider, Button, RadioButtons
 from pandas import read_table
 from tsunamis.utilities.io import read_configuration_file
 
-#from builtins import print as bprint
-#def print(*args, **kwargs):
-#    bprint(*args, **kwargs, flush=True)
 
 class model:
     """
@@ -42,18 +39,13 @@ class model:
         print('Preparing {}...'.format(self.model))
         
         self.parameters = parameters
-        
+        self.results_folder = results_folder
         self.input_directory = input_directory
         
         if output_directory:
             self.output_directory = output_directory
         else:
             self.output_directory = os.path.dirname(os.path.abspath(sys.argv[0]))
-            
-        # Make the results folder if it doesn't already exist
-        results_directory = os.path.join(self.output_directory, results_folder)
-        if not os.path.isdir(results_directory):
-            os.mkdir(results_directory)
 
         if executable_path:
             self.source_executable_path = os.path.abspath(executable_path)
@@ -115,14 +107,8 @@ class model:
         with open(path, 'w') as f:
             for k, v in self.parameters.items():
                 if isinstance(v, bool):
-                    vs = 'T' if v else 'F'
-                elif isinstance(v, int):
-                    vs = str(v)
-                elif isinstance(v, float):
-                    vs = str(v)#'{0:.10f}'.format(v)
-                else:
-                    vs = v
-                f.write(k + ' = ' + vs + '\n') # faster than .format()?
+                    v = 'T' if v else 'F'
+                f.write(f'{k} = {v}\n') 
                 
       
     def write_depth(self, path=''):
@@ -137,6 +123,10 @@ class model:
         """Run the simulation with the given inputs"""
         
         if not output_directory: output_directory = self.output_directory        
+        # Make the results folder if it doesn't already exist
+        results_directory = os.path.join(output_directory, self.results_folder)
+        if not os.path.isdir(results_directory):
+            os.mkdir(results_directory)
         
         n = int(self.parameters['PX']) * int(self.parameters['PY'])
         

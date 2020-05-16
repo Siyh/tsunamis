@@ -12,7 +12,7 @@ from glob import glob
 
 
 from mayavi_widget import MayaviQWidget, mlab
-from common import WidgetMethods, build_wms_url, DoubleSlider, ResultReader
+from common import WidgetMethods, build_wms_url, DoubleSlider, ResultReader, sigfigs
 from tsunamis.utilities.io import read_configuration_file
 
 class TabModelBase(qw.QSplitter, WidgetMethods):    
@@ -23,15 +23,13 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                     'Us':'wave vector u component',
                     'Vs':'wave vector v component',
                     'Ws':'wave vector w component',
-                    'Ps':'?'}
-                         
+                    'Ps':'?'}                         
     
     
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         
-        self.results_folder = 'results'
         self.configuration_path = 'input.txt'
         self.depth_path = 'depth.txt'
         self.parameters = {}
@@ -95,10 +93,14 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         plot_control_layout.addLayout(stepper_buttons)
         plot_buttons.setLayout(plot_control_layout)
         
-        self.play_pause_button = qw.QPushButton('|>') 
-        next_step = qw.QPushButton('>') 
-        previous_step = qw.QPushButton('<') 
-        restart = qw.QPushButton('<<') 
+        self.play_pause_button = qw.QPushButton() 
+        self.set_button_icon(self.play_pause_button, 'SP_MediaPlay')
+        next_step = qw.QPushButton() 
+        self.set_button_icon(next_step, 'SP_MediaSeekForward')
+        previous_step = qw.QPushButton() 
+        self.set_button_icon(previous_step, 'SP_MediaSeekBackward')
+        restart = qw.QPushButton() 
+        self.set_button_icon(restart, 'SP_MediaSkipBackward')
         
         self.play_pause_button.clicked.connect(self.play_pause_clicked)
         next_step.clicked.connect(self.next_timestep)
@@ -122,8 +124,16 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.add_button('Run ' + self.model.model, self.run_model_clicked)  
         self.add_button('Write model inputs', self.write_model_inputs)
         
-        self.add_button('Set model folder', self.set_model_folder) 
-        self.add_button('Set results folder', self.set_results_folder)      
+        self.model_folder = self.add_input('Model folder',
+                                           value='',
+                                           function=self.load_directory,
+                                           dialogue_label=f'Select {self.model.model} folder')
+
+        self.results_folder = self.add_input('Results folder',
+                                             value='results',
+                                             function=self.load_results,
+                                             dialogue_label='Select results folder')
+        
         self.add_button('Load configuration', self.set_configuration_file)
         self.add_input('Processor number X', 'PX', 2)
         self.add_input('Processor number Y', 'PY', 2)
@@ -152,7 +162,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         
         self.create_input_group('Bathymetry', self.make_grid_coords)
-        self.add_button('Load bathymetry from grid', self.set_depth_file)
+        self.add_button('Load bathymetry from grid', self.load_bathymetry)
         self.add_button('Load bathymetry from map', self.download_bathymetry)
         
         self.add_input('Number of cells in the X direction', 'Mglob', 400)
@@ -188,15 +198,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         """
         To be run after the initialisation of the nhwave and funwave tabs
         """
-        if path:
-            self.model_folder = path
-            self.load_directory()
-        else:
-            # TODO this is windows specific
-            self.model_folder = os.path.join(os.environ['USERPROFILE'],
-                                             'Desktop',
-                                             self.model.model)
-   
+        if not path: path = os.path.join(os.environ['USERPROFILE'],
+                                                    'Desktop',
+                                                    self.model.model)
+        self.model_folder.setValue(path)
+            
         
     def refresh_plots(self):
         for f in self.refresh_functions: f()
@@ -279,13 +285,13 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
     def play_pause_clicked(self):
         if self.playing:
             self.playing = False
-            self.play_pause_button.setText('|>')
-            
+            self.set_button_icon(self.play_pause_button, 'SP_MediaPlay')
+
             # Make it stop playings
             self.animator.timer.Stop()
         else:
             self.playing = True
-            self.play_pause_button.setText('||')
+            self.set_button_icon(self.play_pause_button, 'SP_MediaPause')
             
             # Make it play
             if hasattr(self, 'animator'):
@@ -351,7 +357,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
 
     
         
-    def set_depth_file(self):
+    def load_bathymetry(self):
         
         formats = ['Any compatible (*.nc *.asc, *.txt)',
                    'NetCDF (*.nc)',
@@ -361,35 +367,16 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
 
         fname, extension = qw.QFileDialog.getOpenFileName(self,
                                                           'Open depth grid',
-                                                          self.model_folder,
+                                                          self.model_folder.value(),
                                                           ';;'.join(formats))
         if fname: 
             self.load_depth_file(fname)
             
             
-    def set_results_folder(self):        
-        # TODO make this relative to self.directory
-        folder = qw.QFileDialog.getExistingDirectory(self,
-                                                     'Select {} results folder'.format(self.model.model),
-                                                     self.model_folder)   
-        if folder:
-            self.results_folder = folder        
-            self.load_results()
-        
-    
-    def set_model_folder(self):        
-        folder = qw.QFileDialog.getExistingDirectory(self,
-                                                     'Select {} folder'.format(self.model.model),
-                                                     self.model_folder) 
-        if folder:
-            self.model_folder = folder
-            self.load_directory()
-            
-            
     def set_configuration_file(self):        
         fname, extension = qw.QFileDialog.getOpenFileName(self,
                                                           'Open {} configuration file'.format(self.model.model),
-                                                          self.model_folder,
+                                                          self.model_folder.value(),
                                                           'Text file (*.txt);;Other (*.*)')
         if fname:
             self.configuration_path = fname
@@ -405,10 +392,14 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         elif extension == 'asc':
             self.load_arcascii(path)
         elif extension == 'txt':
-            self.zs = -np.loadtxt(path)
-            
-        # Set cell size according to file if appropriate
-        #self.parameters['DX'].setValue()
+            self.zs = -np.loadtxt(path)            
+            # Set cell size according to file if appropriate
+            # dz = self.zs.max() - self.zs.min()
+            # maxdim = max(self.pv('DX'), self.pv('DY'))
+            # if dz > maxdim:
+            #     v = sigfigs(dz / maxdim, 1)
+            #     self.parameters['DX'].setValue(v)
+            #     self.parameters['DY'].setValue(v)
         
         ny, nx = self.zs.shape
         self.parameters['Mglob'].setValue(nx)
@@ -419,7 +410,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.display_bathymetry_changed() 
         
         
-    def load_directory(self):
+    def load_directory(self, directory):
         """
         For loading everything possible when a new modelling directory is given
         """
@@ -427,7 +418,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         for check_path, function in [(self.configuration_path, self.load_configuration_file),
                                      (self.depth_path, self.load_depth_file)]:
             
-            path = os.path.join(self.model_folder, check_path)
+            path = os.path.join(directory, check_path)
             # Check if the check_path is relative
             if os.path.exists(path):
                 function(path)
@@ -439,10 +430,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                 return  
             
         self.load_results()
-        
-        # Refresh the plot
-        # TODO might not be needed
-        #self.timestep_changed()
+
         
 
     def load_configuration_file(self, path):
@@ -527,24 +515,26 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # Set parameters
         for k, w in self.parameters.items():
             self.model.parameters[k] = w.value()            
-        self.model.parameters['RESULT_FOLDER'] = self.results_folder + '/'
+        self.model.parameters['RESULT_FOLDER'] = self.results_folder.value() + '/'
         self.model.depth = -self.zs            
-        self.model.output_directory = self.model_folder
+        self.model.output_directory = self.model_folder.value()
         
         
-    def load_results(self):
-        # Check if there are any results and load them   
+    def load_results(self, folder=''):
+        """
+        Check if there are any results and load them   
+        """        
         
-        folder = os.path.join(self.model_folder, self.results_folder)
-        # Check if the results path is relative
+        if not folder: folder = self.results_folder.value()
+        
+        # Check if the results path is absolute
         if not os.path.isdir(folder):
-            # Check if the results path is absolute
-            if os.path.isdir(self.results_folder):
-                folder = self.results_folder
-            else:
+            # Built an absolute path from the (possibly) relative one
+            folder = os.path.join(self.model_folder.value(), folder)
+            # Check it's valid
+            if not os.path.isdir(folder):
                 # If the folder isn't valid, don't try and load the results
                 return      
-            
         
         reader = ResultReader()
         reader.progress.connect(self.progress)

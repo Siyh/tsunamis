@@ -3,6 +3,7 @@
 
 from PyQt5 import QtWidgets as qw
 import numpy as np
+import os
 
 from tab_model_base import TabModelBase
 from tsunamis.models.nhwave import config as nhwave_config
@@ -67,7 +68,13 @@ class TabNHWAVE(TabModelBase):
         
         
         self.create_input_group('Landslides')
-        self.add_input('Slide thickness', 'SLIDE_FILE', 'SlideThickness.txt')
+        self.add_input('Slide thickness',
+                       'SLIDE_FILE',
+                       'SlideThickness.txt',
+                       function=self.load_slide_thickness,
+                       dialogue_label='Select initial slide thickness',
+                       formats='txt')
+        
         self.add_input('Rheology option', 'RHEO_OPT', {'Viscous':'VISCOUS',
                                                        'Granular':'GRANULAR'})        
         self.add_input('momentum distribution coefficient', 'SLIDE_GAMMA', 1.0)
@@ -253,7 +260,7 @@ class TabNHWAVE(TabModelBase):
         self.add_input('max wave height', 'OUT_M', True,
                        function=self.display_wave_max.setEnabled)
         
-        # Implement GUI version of probe outputs
+        # TODO Implement GUI version of probe outputs
         self.add_input('number of probes', 'NSTAT', 0)
         self.add_input('probe start time', 'PLOT_INTV_STAT', 10.0)
         
@@ -276,8 +283,6 @@ class TabNHWAVE(TabModelBase):
         button = qw.QPushButton('Send wave to FUNWAVE')
         button.clicked.connect(self.send_wave_to_funwave)
         misc.addWidget(button)
-        
-        
         
         self._set_initial_directory(initial_directory)
         
@@ -304,7 +309,6 @@ class TabNHWAVE(TabModelBase):
     
     def vector_output_changed(self, _):
         # TODO why isn't this working
-        print('Vector output changed')
         self.display_wave_vectors.setEnabled(self.pv('OUT_U') or
                                              self.pv('OUT_V') or
                                              self.pv('OUT_W'))
@@ -316,6 +320,10 @@ class TabNHWAVE(TabModelBase):
             self.plot.show_landslide(self.results['depth'][self.timestep])
         else:
             self.plot.hide_landslide()
+            
+    
+    def load_slide_thickness(self, path):
+        self.results['depth'][self.pv('PLOT_START')] = np.loadtxt(path)
         
         
     def recalculate_landslide(self):

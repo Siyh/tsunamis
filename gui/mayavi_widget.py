@@ -104,6 +104,7 @@ class MayaviQWidget(QtGui.QWidget):
         self.xs = xs.T
         self.ys = ys.T
         for plot in [self.bathymetry,
+                     self.coastline,
                      self.wave_height,
                      self.wave_max,
                      self.wave_vectors,
