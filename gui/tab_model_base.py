@@ -478,14 +478,6 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
     
     def load_netcdf(self, path):
         pass
-    
-    
-    def update_map_box(self):
-        #TODO find a better place for this function
-        new_box = self.tab_map.box_coordinates(self.model.model)
-        self.map_box.data.update(new_box)
-        #TODO do this without rerendering the map
-        self.tab_map.map.update()
         
 
     def pv(self, parameter):
@@ -515,9 +507,14 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # Set parameters
         for k, w in self.parameters.items():
             self.model.parameters[k] = w.value()            
+            
         self.model.parameters['RESULT_FOLDER'] = self.results_folder.value() + '/'
         self.model.depth = -self.zs            
         self.model.output_directory = self.model_folder.value()
+        
+        self.model.x0 = self.tab_map.parameters[self.model.model + '_xmin']
+        self.model.y0 = self.tab_map.parameters[self.model.model + '_ymin']
+        self.model.ccrs = self.tab_map.parameters[self.model.model + '_epsg']
         
         
     def load_results(self, folder=''):

@@ -11,7 +11,7 @@ from bokeh.models import ColumnDataSource#, Line
 
 
 class TabMap(qw.QWidget, WidgetMethods):
-    def __init__(self, parent):
+    def __init__(self, parent, parameters={}):
         super(qw.QWidget, self).__init__(parent)
         
         self.parameters = {}
@@ -45,22 +45,28 @@ class TabMap(qw.QWidget, WidgetMethods):
         #=====================================================================
         # Setup inputs
         #=====================================================================
+        
+        self.map_boxes = {}
         for model, colour in [('NHWAVE', 'darkblue'),
                               ('FUNWAVE', 'red')]:
             
-            model_tab = getattr(self.parent(), 'tab_' + model.lower())
-            
-            self.create_input_group(model + ' area', model_tab.update_map_box)
+            # TODO why isn't the NHWAVE box updating?
+            self.create_input_group(model + ' area',
+                                    lambda: self.update_map_box(model))
             self.add_input('EPSG code', model + '_epsg', 4326)
             self.add_input('X min', model + '_xmin', -10.0)
             self.add_input('X max', model + '_xmax', 10.0)
             self.add_input('Y min', model + '_ymin', -10.0)
             self.add_input('Y max', model + '_ymax', 10.0)
             
-            model_tab.map_box = ColumnDataSource(self.box_coordinates(model))
-            self.map.figure.line(source=model_tab.map_box,
+            map_box = ColumnDataSource(self.box_coordinates(model))
+            self.map_boxes[model] = map_box                   
+            
+            self.map.figure.line(source=map_box,
                                  x='x', y='y', line_color=colour,
-                                 legend_label=model)
+                                 legend_label=model)            
+            
+        self.update_parameters(parameters)
         
         self.map.update()
         
@@ -82,19 +88,30 @@ class TabMap(qw.QWidget, WidgetMethods):
         ys = list(np.linspace(ymin, ymax, 100))
         x_around = xs + [xmax] * 98 + xs[::-1] + [xmin] * 98
         y_around = [ymin] * 100 + ys[1:-1] + [ymax] * 100 + ys[1:-1][::-1]
+        x_around = np.array(x_around)
+        y_around = np.array(y_around)
         
         # Convert the CS if necessary
         epsg = self.parameters[prefix + '_epsg'].value()
         if epsg != 4326:
             cs = ccrs.epsg(epsg)        
             tf = ccrs.Geodetic().transform_points(cs, x_around, y_around)
-            print(tf)
-            #TODO use updated coordinates
+            x_around, y_around, _ = tf.T            
             
-        return dict(x=x_around, y=y_around)
+        return dict(x=x_around, y=y_around)    
+    
+        
+    def update_map_box(self, model):
+        new_box = self.box_coordinates(model)
+        self.map_boxes[model].data.update(new_box)
+        #TODO do this without rerendering the map
+        self.map.update()
     
     
-    
+    def update_parameters(self, new_parameters):
+        for p, v in new_parameters.items():
+            if p in self.parameters:
+                self.parameters[p].setValue(v)
     
     
     

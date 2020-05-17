@@ -36,7 +36,7 @@ class model:
         
         """                 
         
-        print('Preparing {}...'.format(self.model))
+        print(f'Preparing {self.model}...')
         
         self.parameters = parameters
         self.results_folder = results_folder
@@ -169,12 +169,15 @@ class model:
         xn = xs.size
         yn = ys.size
         dx = (maxx - minx) / xn
-        dy = (maxy - miny) / yn
+        dy = (maxy - miny) / yn        
         
-        self.update_inputs(Mglob=xn, Nglob=yn, DX=dx, DY=dy)    
+        self.parameters['Mglob'] = xn
+        self.parameters['Nglob'] = yn
+        self.parameters['DX'] = dx
+        self.parameters['DY'] = dy
         
         print('Converting xyz data to grid')        
-        self.depth = zs.reshape((int(self.Nglob), int(self.Mglob)))
+        self.depth = zs.reshape((yn, xn))
         
         self.check_save_depth(elevation)       
         
@@ -213,7 +216,10 @@ class model:
         dx = (maxx - minx) / xn
         dy = (maxy - miny) / yn
         
-        self.update_inputs(Mglob=xn, Nglob=yn, DX=dx, DY=dy)  
+        self.parameters['Mglob'] = xn
+        self.parameters['Nglob'] = yn
+        self.parameters['DX'] = dx
+        self.parameters['DY'] = dy
         
         self.check_save_depth(elevation) 
                     

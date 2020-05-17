@@ -1,6 +1,7 @@
 # Main window for Tsunami GUI
 # Simon Libby 
 
+import os
 from PyQt5 import QtWidgets as qw
 from PyQt5 import QtGui, QtCore
 from mayavi import mlab
@@ -8,10 +9,11 @@ from mayavi import mlab
 from tab_map import TabMap
 from tab_nhwave import TabNHWAVE
 from tab_funwave import TabFUNWAVE
+from tsunamis.utilities.io import read_configuration_file
 
 
 class TsunamiWindow(qw.QMainWindow):
-    def __init__(self, nhwave='', funwave=''):
+    def __init__(self, config=''):
         super().__init__()
         
         #======================================================================
@@ -28,18 +30,40 @@ class TsunamiWindow(qw.QMainWindow):
         else:
             # This seems to be needed to make showMaximized work
             self.setGeometry(100, 100, 1000, 600)
-            self.showMaximized()            
-
+            self.showMaximized()
             
+        #======================================================================
+        # Load the initial config if one was provided
+        #======================================================================        
+        
+        # TODO call load_config instead
+        if config:
+            parameters = read_configuration_file(config)
+            
+            config_folder = os.path.dirname(config)
+            
+            nhwave_config = parameters.get('NHWAVE_config', '')
+            if nhwave_config:
+                nhwave_config = os.path.join(config_folder, nhwave_config)
+                
+            funwave_config = parameters.get('FUNWAVE_config', '')
+            if funwave_config:
+                funwave_config = os.path.join(config_folder, funwave_config)
+            
+        else:
+            nhwave_config = ''
+            funwave_config = ''
+            parameters = {}
+        
         #======================================================================
         # Setup the window contents
         #======================================================================
         
         # Create the tabs
         self.tabs = qw.QTabWidget(self)        
-        self.tab_nhwave = TabNHWAVE(self, nhwave)
-        self.tab_funwave = TabFUNWAVE(self, funwave)
-        self.tab_map = TabMap(self)
+        self.tab_nhwave = TabNHWAVE(self, nhwave_config)
+        self.tab_funwave = TabFUNWAVE(self, funwave_config)
+        self.tab_map = TabMap(self, parameters)
         
         # Show the map tab on the other tabs
         self.tab_nhwave.tab_map = self.tab_map
@@ -82,6 +106,18 @@ class TsunamiWindow(qw.QMainWindow):
         debugging = self.menu_bar.addMenu('Debugging')
         close = debugging.addAction('Quit Spyder Instance')
         close.triggered.connect(qw.QApplication.quit)
+        
+        
+    def save_config_clicked(self):
+        # Open a dialogue to define the config
+        pass
+    
+    def load_config_clicked(self):
+        # Open a dialogue to the config
+        self.load_config(path)
+    
+    def load_config(self, path):
+        pass
              
 
                 

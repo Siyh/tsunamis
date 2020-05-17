@@ -117,8 +117,8 @@ class TabNHWAVE(TabModelBase):
         self.start_dropdown('Sponge boundary')
         self.add_input('Sponge on', 'SPONGE_ON', False)
         for d in ['North', 'East', 'South', 'West']:
-            self.add_input('Sponge {} width'.format(d.lower()),
-                           'Sponge_{}_Width'.format(d), 0.0)           
+            self.add_input(f'Sponge {d.lower()} width',
+                           f'Sponge_{d}_Width', 0.0)           
         self.add_input('Maximum iterations', 'ITMAX', 1000)
         self.add_input('Tolerance', 'TOL', 1E-8)
         self.finish_dropdown()        
@@ -298,6 +298,8 @@ class TabNHWAVE(TabModelBase):
         self.set_model_inputs()
         funwave_tab = self.parent.tab_funwave
         funwave_tab.set_model_inputs()
+        
+        
         
         # And convert
         self.model.nhw_to_funw(fwo=funwave_tab.model,

@@ -4,7 +4,7 @@
 import os
 import numpy as np
 
-from .base import model       
+from tsunamis.models.base import model       
     
 class config(model):
     model = 'FUNWAVE'

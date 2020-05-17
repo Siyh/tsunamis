@@ -1,14 +1,14 @@
 #Class objects for nhwave and funwave
 #Simon Libby 2017
 
-import os, sys
+import os
 import numpy as np
 import cartopy.crs as ccrs
 from glob import glob
 from shutil import copyfile
 from scipy.interpolate import griddata
 
-from .base import model      
+from tsunamis.models.base import model      
  
         
 class config(model):
@@ -71,8 +71,10 @@ class config(model):
         
         self.depth = zz
         np.savetxt(self.depth_path, zz, fmt='%5.5g')
-        self.update_inputs(Mglob=zz.shape[1], Nglob=zz.shape[0],
-                DX=float(res), DY=float(res))
+        self.parameters['Mglob'] = zz.shape[1]
+        self.parameters['Nglob'] = zz.shape[0]
+        self.parameters['DX'] = float(res)
+        self.parameters['DY'] = float(res)
         self.x0 = x0
         self.y0 = y0
         
@@ -138,35 +140,50 @@ class config(model):
         """
         #TODO implement getting x0s and y0s from surface inputs
         #Get the number (with preceeding zeros) of the result to convert
-        if result_to_convert:
-            result_to_convert = str(result_to_convert)
-            preceeding_zeros = (5 - len(result_to_convert)) * '0'
-            result_to_convert = preceeding_zeros + result_to_convert
-        else:
+        if result_to_convert is None:
             #List of the results
             results = glob(self.results_dir + 'eta_*')
             #Check there are some results to convert
             if not results:
                 print('No results to convert')
-                sys.exit()
+                return
             #Find the largest file number to convert
-            result_to_convert = max(results)[-5:]
-        #Get the folder to move the results to
-        target = fwo.mod_dir
+            result_to_convert = int(max(results)[-5:])
                    
         print('Interpolating nhwave grids to funwave grids')        
     
-        #Define coordinate systems
-        if not funw_crs: funw_crs = ccrs.PlateCarree()
-        if type(funw_crs) == int: funw_crs = ccrs.epsg(funw_crs)
-        if type(nhw_crs) == int: nhw_crs = ccrs.epsg(nhw_crs)
+        
         
         #Check what transformation is necessary
         if np.array_equal(self.depth, fwo.depth):
             print('Grids are in the same place')
         else:
-            xl = list(self.gs(fwo.Mglob, fwo.DX, fx0))
-            yl = list(self.gs(fwo.Nglob, fwo.DY, fy0))      
+            # Define coordinate systems
+            if not funw_crs: funw_crs = ccrs.PlateCarree()
+            if isinstance(funw_crs, int): funw_crs = ccrs.epsg(funw_crs)
+            if isinstance(nhw_crs, int): nhw_crs = ccrs.epsg(nhw_crs)
+            
+            if nx0 is None:
+                nx0 = self.x0
+                if nx0 is None: raise Exception('NHWAVE x0 not specified')
+                
+            if ny0 is None:
+                ny0 = self.y0
+                if ny0 is None: raise Exception('NHWAVE y0 not specified')
+                
+            if fx0 is None:
+                fx0 = fwo.x0
+                if fx0 is None: raise Exception('FUNWAVE x0 not specified')
+                
+            if fy0 is None:
+                fy0 = fwo.y0
+                if fy0 is None: raise Exception('FUNWAVE y0 not specified')            
+            
+            
+            xl = list(self.gs(fwo.parameters['Mglob'],
+                              fwo.parameters['DX'], fx0))
+            yl = list(self.gs(fwo.parameters['Nglob'],
+                              fwo.parameters['DY'], fy0))      
             
             if ((self.depth.shape != fwo.depth.shape) and 
                     (self.DX == fwo.DX) and
@@ -180,7 +197,8 @@ class config(model):
                 indices = np.zeros_like(fwo.depth, dtype=bool)
                 xi = xl.index(nx0)
                 yi = yl.index(ny0)
-                indices[yi:yi + int(self.Nglob), xi:xi + int(self.Mglob)] = True
+                indices[yi:yi + self.parameters['Nglob'],
+                        xi:xi + self.parameters['Mglob']] = True
                 indices = np.where(indices)
                 
             elif interpolate:
@@ -200,8 +218,10 @@ class config(model):
                 xc = x0+hx + np.cos(a) * dx - np.sin(a) * dy
                 yc = y0+hy + np.sin(a) * dx + np.cos(a) * dy
                 """
-                xl = self.gs(self.Mglob, self.DX, nx0)
-                yl = self.gs(self.Nglob, self.DY, ny0)
+                xl = self.gs(self.parameters['Mglob'],
+                             self.parameters['DX'], nx0)
+                yl = self.gs(self.parameters['Nglob'],
+                             self.parameters['DY'], ny0)
                 xc, yc = np.meshgrid(xl, yl)
                 #Transform points to funwave crs
                 transformed = funw_crs.transform_points(nhw_crs, xc, yc)
@@ -209,16 +229,18 @@ class config(model):
                 ys = transformed[:, :, 1].flatten()     
                 
                 #Make dimensions of grid for funwave files to be interpolated to
-                xx = self.gs(fwo.Mglob, fwo.DX, fx0)
-                yy = self.gs(fwo.Nglob, fwo.DY, fy0)
+                xx = self.gs(fwo.parameters['Mglob'],
+                             fwo.parameters['DX'], fx0)
+                yy = self.gs(fwo.parameters['Nglob'],
+                             fwo.parameters['DY'], fy0)
             
         
         #For each grid to be copied
         for f in ['eta', 'u', 'v']:
-            print('Interpolating "' + f + '" surface')
-            source_path = self.results_dir + f + '_' + result_to_convert
+            print(f'Interpolating "{f}" surface')
+            source_path = self.results_dir + f + f'_{result_to_convert:05d}'
             #There are velocity values for each water layer, hence index bit
-            zs = np.loadtxt(source_path)[:int(self.Nglob)]
+            zs = np.loadtxt(source_path)[:self.parameters['Nglob']]
             #Get rid of land elevation on wave data, except where wave over land
             if f == 'eta':
                 zs[(zs > 0) * (zs > self.depth)] = 0
@@ -237,13 +259,15 @@ class config(model):
                 zs = np.nan_to_num(griddata((xs, ys), zs.flatten(),
                         (xx[None,:], yy[:,None]), method=method))
                 
-            np.savetxt(target + f + '.txt', zs, fmt='%5.5g')
-            fwo.__dict__.update({f: zs})
+            np.savetxt(os.path.join(fwo.output_directory, f + '.txt'),
+                       zs, fmt='%5.5g')
+            setattr(fwo, f, zs)
+            #fwo.__dict__.update({f: zs})
         
         #Put a landslide lump on the bathymetry
         if landslide:                      
             #Manage a copy of the bathymetry without landslide data
-            dwlp = os.path.join(fwo.mod_dir, 'depth_without_landslide.txt')
+            dwlp = os.path.join(fwo.output_directory, 'depth_without_landslide.txt')
             #If a landslide has already been added to the funwave depth file
             if os.path.isfile(dwlp):
                 #Replace depth.txt with the depth without a landslide
@@ -255,10 +279,13 @@ class config(model):
                 #Save a copy of the depth without the landslide
                 copyfile(fwo.depth_path, dwlp)
                 
-            landslide = self.gen_ls(int(result_to_convert) *
-                    float(self.TOTAL_TIME) * float(self.PLOT_INTV) /
-                    (float(self.TOTAL_TIME) - float(self.PLOT_START)))
-            
+            # Get a copy of the landslide thickness by subtracting the depth 
+            # from the landslide
+            results_path = os.path.join(self.output_directory,
+                                        self.parameters['RESULT_FOLDER'])
+            ndwlp = results_path + f'depth_{result_to_convert:05d}'
+            landslide = np.loadtxt(ndwlp) - np.loadtxt(self.depth_path)
+
             print('Adding a landslide to the depth file')  
             #Add the landslide to funwaves depth
             if insert:

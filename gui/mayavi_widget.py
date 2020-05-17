@@ -88,7 +88,9 @@ class MayaviQWidget(QtGui.QWidget):
         
         self.visualization.scene.add_actor(self.timestep_label)
         
+        
         self.bathymetry = None
+        self.coastline = None
         self.wave_height = None
         self.wave_max = None
         self.wave_vectors = None
@@ -287,9 +289,11 @@ class MayaviQWidget(QtGui.QWidget):
         self.vertical_exaggeration = exaggeration
         
         for plot in [self.bathymetry,
+                     self.coastline,
                      self.wave_height,
                      self.wave_max,
-                     self.wave_vectors]:
+                     self.wave_vectors,
+                     self.landslide]:
             if plot is not None:
                 warp_filter = plot.mlab_source.m_data.children[0]
                 warp_filter.filter.scale_factor = exaggeration
