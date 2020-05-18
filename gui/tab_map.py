@@ -46,30 +46,32 @@ class TabMap(qw.QWidget, WidgetMethods):
         # Setup inputs
         #=====================================================================
         
-        self.map_boxes = {}
-        for model, colour in [('NHWAVE', 'darkblue'),
-                              ('FUNWAVE', 'red')]:
-            
-            # TODO why isn't the NHWAVE box updating?
-            self.create_input_group(model + ' area',
-                                    lambda: self.update_map_box(model))
-            self.add_input('EPSG code', model + '_epsg', 4326)
-            self.add_input('X min', model + '_xmin', -10.0)
-            self.add_input('X max', model + '_xmax', 10.0)
-            self.add_input('Y min', model + '_ymin', -10.0)
-            self.add_input('Y max', model + '_ymax', 10.0)
-            
-            map_box = ColumnDataSource(self.box_coordinates(model))
-            self.map_boxes[model] = map_box                   
-            
-            self.map.figure.line(source=map_box,
-                                 x='x', y='y', line_color=colour,
-                                 legend_label=model)            
-            
+        self.map_boxes = ColumnDataSource()
+        self.add_map_area('NHWAVE', 'darkblue')
+        self.add_map_area('FUNWAVE', 'red')
         self.update_parameters(parameters)
-        
         self.map.update()
         
+    
+    def add_map_area(self, model, colour):
+        self.create_input_group(model + ' area',
+                                lambda: self.update_map_box(model))
+        self.add_input('EPSG code', model + '_epsg', 4326)
+        self.add_input('X min', model + '_xmin', -10.0)
+        self.add_input('X max', model + '_xmax', 10.0)
+        self.add_input('Y min', model + '_ymin', -10.0)
+        self.add_input('Y max', model + '_ymax', 10.0)
+        
+        new_box = self.box_coordinates(model)
+        for k, v in new_box.items():
+            self.map_boxes.add(data=v, name=k)                  
+        
+        self.map.figure.line(source=self.map_boxes,
+                             x=model + '_x',
+                             y=model + '_y',
+                             line_color=colour,
+                             legend_label=model)            
+            
         
     
     def box_limits(self, prefix):
@@ -98,12 +100,15 @@ class TabMap(qw.QWidget, WidgetMethods):
             tf = ccrs.Geodetic().transform_points(cs, x_around, y_around)
             x_around, y_around, _ = tf.T            
             
-        return dict(x=x_around, y=y_around)    
+        return {prefix + '_x' : x_around, prefix + '_y' : y_around}
     
         
     def update_map_box(self, model):
+        #TODO there must be a tidier way to move the dictionares around
         new_box = self.box_coordinates(model)
-        self.map_boxes[model].data.update(new_box)
+        data = dict(self.map_boxes.data)
+        data.update(new_box)
+        self.map_boxes.data = data
         #TODO do this without rerendering the map
         self.map.update()
     
