@@ -12,7 +12,7 @@ from common import sigfigs
 
 class TabNHWAVE(TabModelBase):
     
-    def __init__(self, parent, initial_directory):
+    def __init__(self, parent):
         self.model = nhwave_config()
         
         # Add varying bathymetry to the list of outputs to load
@@ -262,8 +262,7 @@ class TabNHWAVE(TabModelBase):
         
         # TODO Implement GUI version of probe outputs
         self.add_input('number of probes', 'NSTAT', 0)
-        self.add_input('probe start time', 'PLOT_INTV_STAT', 10.0)
-        
+        self.add_input('probe start time', 'PLOT_INTV_STAT', 10.0)        
         
         
         self.display_landslide = self.add_input('Landslide', value=True,
@@ -283,9 +282,7 @@ class TabNHWAVE(TabModelBase):
         button = qw.QPushButton('Send wave to FUNWAVE')
         button.clicked.connect(self.send_wave_to_funwave)
         misc.addWidget(button)
-        
-        self._set_initial_directory(initial_directory)
-        
+                
         
     def send_wave_to_funwave(self):
         # Get index of the result to convert

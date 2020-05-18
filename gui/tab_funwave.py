@@ -3,12 +3,12 @@
 
 from tab_model_base import TabModelBase
 from tsunamis.models.funwave import config as funwave_config
-from PyQt5 import QtGui
+# from PyQt5 import QtGui
 from PyQt5 import QtWidgets as qw
 
 
 class TabFUNWAVE(TabModelBase):    
-    def __init__(self, parent, initial_directory):
+    def __init__(self, parent):
         self.model = funwave_config()
         
         super().__init__(parent)
@@ -80,7 +80,6 @@ class TabFUNWAVE(TabModelBase):
                        dialogue_label='Set stations file',
                        formats='txt')
         
-        self._set_initial_directory(initial_directory)
 
         
     

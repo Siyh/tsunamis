@@ -298,6 +298,7 @@ class WidgetMethods:
                                                    self.model_folder.value())
         if path:
             target.setValue(path)
+            
         
     def file_dialogue(self, label, formats, target):
         path, extension = qw.QFileDialog.getOpenFileName(self,

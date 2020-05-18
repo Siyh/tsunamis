@@ -30,30 +30,8 @@ class TsunamiWindow(qw.QMainWindow):
         else:
             # This seems to be needed to make showMaximized work
             self.setGeometry(100, 100, 1000, 600)
-            self.showMaximized()
+            self.showMaximized()           
             
-        #======================================================================
-        # Load the initial config if one was provided
-        #======================================================================        
-        
-        # TODO call load_config instead
-        if config:
-            parameters = read_configuration_file(config)
-            
-            config_folder = os.path.dirname(config)
-            
-            nhwave_config = parameters.get('NHWAVE_config', '')
-            if nhwave_config:
-                nhwave_config = os.path.join(config_folder, nhwave_config)
-                
-            funwave_config = parameters.get('FUNWAVE_config', '')
-            if funwave_config:
-                funwave_config = os.path.join(config_folder, funwave_config)
-            
-        else:
-            nhwave_config = ''
-            funwave_config = ''
-            parameters = {}
         
         #======================================================================
         # Setup the window contents
@@ -61,9 +39,9 @@ class TsunamiWindow(qw.QMainWindow):
         
         # Create the tabs
         self.tabs = qw.QTabWidget(self)        
-        self.tab_nhwave = TabNHWAVE(self, nhwave_config)
-        self.tab_funwave = TabFUNWAVE(self, funwave_config)
-        self.tab_map = TabMap(self, parameters)
+        self.tab_nhwave = TabNHWAVE(self)
+        self.tab_funwave = TabFUNWAVE(self)
+        self.tab_map = TabMap(self)
         
         # Show the map tab on the other tabs
         self.tab_nhwave.tab_map = self.tab_map
@@ -88,37 +66,70 @@ class TsunamiWindow(qw.QMainWindow):
         self.setCentralWidget(self.tabs)   
         
         
-        
         #======================================================================
         # Configure the menu bars
         #======================================================================
         self.menu_bar = self.menuBar()
         file_menu = self.menu_bar.addMenu('File')
-        # Add load nhwave input button and connect to specific function
-        load_nhwave_input = file_menu.addAction('Load nhwave input file')
-        load_nhwave_input.triggered.connect(self.tab_nhwave.set_configuration_file)
         
-        # Add load funwave input button and connect to specific function
-        load_funwave_input = file_menu.addAction('Load funwave input file')
-        load_funwave_input.triggered.connect(self.tab_funwave.set_configuration_file)
-
-        # Allow the GUI to be quit when run from Spyder
-        debugging = self.menu_bar.addMenu('Debugging')
-        close = debugging.addAction('Quit Spyder Instance')
-        close.triggered.connect(qw.QApplication.quit)
+        load_config = file_menu.addAction('Load configuration')
+        load_config.triggered.connect(self.load_config_clicked)
+        
+        save_config = file_menu.addAction('Save configuration')
+        save_config.triggered.connect(self.save_config_clicked)              
+        
+        
+        # Load the initial config if one was provided
+        if config:
+            self.load_config(config)
+        else:
+            self.config_folder = os.path.join(os.environ['USERPROFILE'], 'Desktop')
         
         
     def save_config_clicked(self):
         # Open a dialogue to define the config
-        pass
+        fname, extension = qw.QFileDialog.getSaveFileName(self,
+                                                          'Save Tsunami modelling configuration file',
+                                                          self.config_folder,
+                                                          'Tsunami configuration file (*.tsu)')
+        if fname:
+            parameters = {k: w.value() for k, w in self.tab_map.parameters.items()}
+            # Implemented as a loop to make easy expansion later
+            for folder_key, tab in [('NHWAVE_folder', self.tab_nhwave),
+                                    ('FUNWAVE_folder', self.tab_funwave)]:
+                parameters[folder_key] = tab.model_folder.value()
+            
+            # Write the config file
+            with open(fname, 'w') as f:
+                for k, v in parameters.items():
+                    f.write(f'{k} = {v}\n')
+    
     
     def load_config_clicked(self):
         # Open a dialogue to the config
-        self.load_config(path)
+        fname, extension = qw.QFileDialog.getOpenFileName(self,
+                                                          'Open Tsunami modelling configuration file',
+                                                          self.config_folder,
+                                                          'Tsunami configuration file (*.tsu)')
+        if fname:            
+            self.load_config(fname)
+        
     
-    def load_config(self, path):
-        pass
-             
+    def load_config(self, path):        
+        parameters = read_configuration_file(path)        
+        self.config_folder = os.path.dirname(path)
+        
+        self.tab_map.update_parameters(parameters)
+        
+        
+        # Load the provided inputs for nhwave and funwave
+        for folder_key, tab in [('NHWAVE_folder', self.tab_nhwave),
+                                ('FUNWAVE_folder', self.tab_funwave)]:            
+        
+            folder = parameters.get(folder_key, '')
+            if folder:
+                folder_full_path = os.path.join(self.config_folder, folder)
+                tab.load_directory(folder_full_path)
 
                 
 

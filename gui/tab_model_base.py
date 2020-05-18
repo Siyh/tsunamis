@@ -124,8 +124,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.add_button('Run ' + self.model.model, self.run_model_clicked)  
         self.add_button('Write model inputs', self.write_model_inputs)
         
+        desktop = os.path.join(os.environ['USERPROFILE'],
+                               'Desktop',
+                               self.model.model)
         self.model_folder = self.add_input('Model folder',
-                                           value='',
+                                           value=desktop,
                                            function=self.load_directory,
                                            dialogue_label=f'Select {self.model.model} folder')
 
@@ -192,16 +195,6 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.refresh_functions = [self.display_wave_height_changed,
                                   self.display_wave_max_changed,
                                   self.display_wave_vectors_changed]
-        
-         
-    def _set_initial_directory(self, path):
-        """
-        To be run after the initialisation of the nhwave and funwave tabs
-        """
-        if not path: path = os.path.join(os.environ['USERPROFILE'],
-                                                    'Desktop',
-                                                    self.model.model)
-        self.model_folder.setValue(path)
             
         
     def refresh_plots(self):
@@ -375,11 +368,10 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             
     def set_configuration_file(self):        
         fname, extension = qw.QFileDialog.getOpenFileName(self,
-                                                          'Open {} configuration file'.format(self.model.model),
+                                                          f'Open {self.model.model} configuration file',
                                                           self.model_folder.value(),
                                                           'Text file (*.txt);;Other (*.*)')
-        if fname:
-            self.configuration_path = fname
+        if fname:            
             self.load_configuration_file(fname)
             
         
@@ -414,6 +406,12 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         """
         For loading everything possible when a new modelling directory is given
         """
+        # Catch recursive setting of the directory
+        if directory == self.model_folder.value():
+            return
+        else:
+            self.model_folder.setValue(directory)
+            
         # If the inputs exists then load them
         for check_path, function in [(self.configuration_path, self.load_configuration_file),
                                      (self.depth_path, self.load_depth_file)]:
@@ -434,6 +432,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
 
     def load_configuration_file(self, path):
+        self.configuration_path = path
+        
         # Load parameters from input text file
         loadedParameters = read_configuration_file(path)
         
