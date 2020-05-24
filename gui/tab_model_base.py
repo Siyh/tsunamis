@@ -2,7 +2,7 @@
 # Simon Libby 2020
 
 from PyQt5 import QtWidgets as qw
-from PyQt5.QtCore import Qt, pyqtSlot
+from PyQt5.QtCore import Qt
 import numpy as np
 import os
 import requests
@@ -12,18 +12,19 @@ from glob import glob
 
 
 from mayavi_widget import MayaviQWidget, mlab
-from common import WidgetMethods, build_wms_url, DoubleSlider, ResultReader, sigfigs
+from common import WidgetMethods, build_wms_url, DoubleSlider, sigfigs
 from tsunamis.utilities.io import read_configuration_file
 
 class TabModelBase(qw.QSplitter, WidgetMethods):    
 
     # Result types and descriptions to be loaded
     result_types = {'eta':'wave height result',
-                    'hmax':'max wave height result',
-                    'Us':'wave vector u component',
+                    #DEBUG commented out to speed up loading during testing
+                    #'hmax':'max wave height result',
+                     'Us':'wave vector u component',
                     'Vs':'wave vector v component',
-                    'Ws':'wave vector w component',
-                    'Ps':'?'}                         
+                    #'Ps':'?',
+                    }                         
     
     
     def __init__(self, parent):
@@ -161,10 +162,10 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.add_input('Minimium timestep', 'DT_MIN', 0.01)
         self.add_input('Maximum timestep', 'DT_MAX', 10.0)
         # TODO implement hotstarting
-        self.add_input('Hotstart', 'HOTSTART', False)
+        hotstart = self.add_input('Hotstart', 'HOTSTART', False)
+        hotstart.setEnabled = False
         
-        
-        self.create_input_group('Bathymetry', self.make_grid_coords)
+        self.bathymetry_group = self.create_input_group('Bathymetry', self.make_grid_coords)
         self.add_button('Load bathymetry from grid', self.load_bathymetry)
         self.add_button('Load bathymetry from map', self.download_bathymetry)
         
@@ -186,8 +187,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.make_grid_coords()
         
         # Make dummy zs
-        self.zs = (self.ys - self.ys.max()) / 20
-        
+        self.zs = (self.ys - self.ys.max()) / 20        
         self.display_bathymetry_changed()
 
         
@@ -195,7 +195,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.refresh_functions = [self.display_wave_height_changed,
                                   self.display_wave_max_changed,
                                   self.display_wave_vectors_changed]
-            
+                    
         
     def refresh_plots(self):
         for f in self.refresh_functions: f()
@@ -398,7 +398,6 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.parameters['Nglob'].setValue(ny)    
         
         self.make_grid_coords()
-        
         self.display_bathymetry_changed() 
         
         
@@ -428,6 +427,9 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                 return  
             
         self.load_results()
+        
+        # Draw landslide for NWHAVE and load initial wave for FUNWAVE
+        self.load_directory_extras()
 
         
 
@@ -494,6 +496,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # And run
         run = self.model.run()
         
+        # Load the results if the run was successful
         if run: self.load_results()
         
     
@@ -512,9 +515,26 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.model.depth = -self.zs            
         self.model.output_directory = self.model_folder.value()
         
-        self.model.x0 = self.tab_map.parameters[self.model.model + '_xmin']
-        self.model.y0 = self.tab_map.parameters[self.model.model + '_ymin']
-        self.model.ccrs = self.tab_map.parameters[self.model.model + '_epsg']
+        self.model.x0 = self.tab_map.parameters[self.model.model + '_xmin'].value()
+        self.model.y0 = self.tab_map.parameters[self.model.model + '_ymin'].value()
+        self.model.ccrs = self.tab_map.parameters[self.model.model + '_epsg'].value()
+        
+        # Check the path to the exe is correct
+        if not os.path.isfile(self.model.source_executable_path):
+            self.set_executable_path()
+            
+    
+    def set_executable_path(self):
+        if os.path.isfile(self.model.source_executable_path):
+            initial_folder = self.model.source_executable_path
+        else:
+            initial_folder = self.model_folder.value()
+            
+        fname, extension = qw.QFileDialog.getOpenFileName(self,
+                                                          f'Select {self.model.model} executable',
+                                                          initial_folder) 
+        if fname:
+            self.model.source_executable_path = fname
         
         
     def load_results(self, folder=''):
@@ -532,10 +552,6 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             if not os.path.isdir(folder):
                 # If the folder isn't valid, don't try and load the results
                 return      
-        
-        reader = ResultReader()
-        reader.progress.connect(self.progress)
-
 
         for label, record in self.results.items():
             # Get a list of the results
@@ -548,31 +564,17 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             
             # No result for the first timestep
             record[self.timesteps[0]] = np.zeros_like(self.zs)
-                       
-            # DEBUG OPTION
-            # file_list = file_list[:5]
             
             for timestep, path in zip(self.timesteps[1:], file_list):
-                reader.add_task(record, timestep, path)
+                self.parent.reader.add_task(record, timestep, path)
         
-        reader.start()
-        
-        # Probably a better way to do this
-        if hasattr(self, 'recalculate_landslide'):
-            self.recalculate_landslide()
+        self.parent.reader.start()
         
         # Refresh any plots that are showing
         self.refresh_plots()
         
-        
 
 
-
-
-    @pyqtSlot(float, str)
-    def progress(self, fraction, message):
-        self.parent.progressBar.setValue(round(fraction * 100))
-        self.parent.statusBar.showMessage(message, 2000)
 
 
         

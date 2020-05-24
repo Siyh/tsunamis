@@ -9,6 +9,7 @@ from mayavi import mlab
 from tab_map import TabMap
 from tab_nhwave import TabNHWAVE
 from tab_funwave import TabFUNWAVE
+from common import ResultReader
 from tsunamis.utilities.io import read_configuration_file
 
 
@@ -30,8 +31,12 @@ class TsunamiWindow(qw.QMainWindow):
         else:
             # This seems to be needed to make showMaximized work
             self.setGeometry(100, 100, 1000, 600)
-            self.showMaximized()           
+            self.showMaximized()       
             
+        # Setup the thread for reading results. This is done in a separate 
+        # thread so the gui doesn't hang
+        self.reader = ResultReader()
+        self.reader.progress.connect(self.progress)
         
         #======================================================================
         # Setup the window contents
@@ -76,7 +81,13 @@ class TsunamiWindow(qw.QMainWindow):
         load_config.triggered.connect(self.load_config_clicked)
         
         save_config = file_menu.addAction('Save configuration')
-        save_config.triggered.connect(self.save_config_clicked)              
+        save_config.triggered.connect(self.save_config_clicked)     
+        
+        set_nhwave_executable = file_menu.addAction('Set NHWAVE executable')
+        set_nhwave_executable.triggered.connect(self.tab_nhwave.set_executable_path)
+        
+        set_funwave_executable = file_menu.addAction('Set FUNWAVE executable')
+        set_funwave_executable.triggered.connect(self.tab_funwave.set_executable_path)
         
         
         # Load the initial config if one was provided
@@ -121,7 +132,8 @@ class TsunamiWindow(qw.QMainWindow):
         
         self.tab_map.update_parameters(parameters)
         
-        
+        # Pause loading incase there are results from both programs
+        self.reader.active = False
         # Load the provided inputs for nhwave and funwave
         for folder_key, tab in [('NHWAVE_folder', self.tab_nhwave),
                                 ('FUNWAVE_folder', self.tab_funwave)]:            
@@ -130,7 +142,15 @@ class TsunamiWindow(qw.QMainWindow):
             if folder:
                 folder_full_path = os.path.join(self.config_folder, folder)
                 tab.load_directory(folder_full_path)
-
+        
+        # Read in results
+        self.reader.run_threads()
+        
+        
+    @QtCore.pyqtSlot(float, str)
+    def progress(self, fraction, message):
+        self.progressBar.setValue(round(fraction * 100))
+        self.statusBar.showMessage(message, 2000)
                 
 
     def closeEvent(self, event):
