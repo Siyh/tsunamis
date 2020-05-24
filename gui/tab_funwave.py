@@ -5,6 +5,8 @@ from tab_model_base import TabModelBase
 from tsunamis.models.funwave import config as funwave_config
 # from PyQt5 import QtGui
 from PyQt5 import QtWidgets as qw
+import numpy as np
+import os
 
 
 class TabFUNWAVE(TabModelBase):    
@@ -13,12 +15,19 @@ class TabFUNWAVE(TabModelBase):
         
         super().__init__(parent)
         
+        self.add_input('Depth file',
+                        'DEPTH_FILE',
+                        'depth.txt',
+                        dialogue_label='Set bathymetry depth file',
+                        formats='txt',                       
+                        layout=self.bathymetry_group.layout())
+        
         self.create_input_group('Initial wave')               
         self.add_input('Use initial wave', 'INI_UVZ', True,
                        function=self.initial_wave_enabled_changed)
         self.initial_wave_controls = [
-                self.add_button('Set initial wave folder',
-                                self.set_initial_wave_folder),
+                self.add_button('Load initial wave folder from folder',
+                                self.load_initial_wave_from_folder),
                 self.add_input('wave height',
                                'ETA_FILE',
                                value='eta.txt',
@@ -26,12 +35,12 @@ class TabFUNWAVE(TabModelBase):
                                formats='txt'),
                 self.add_input('wave u vector',
                                'U_FILE',
-                               value='u.txt',
+                               value='Us.txt',
                                dialogue_label='Set initial wave u vector',
                                formats='txt'),
                 self.add_input('wave v vector',
                                'V_FILE',
-                               value='v.txt',
+                               value='Vs.txt',
                                dialogue_label='Set initial wave v vector',
                                formats='txt')
                 ]
@@ -80,27 +89,55 @@ class TabFUNWAVE(TabModelBase):
                        dialogue_label='Set stations file',
                        formats='txt')
         
-
+        self.initial_wave_folder = None
+        
+        
+    def load_directory_extras(self):
+        # Load the initial changes
+        self.load_initial_wave()
         
     
-    def set_initial_wave_folder(self):        
-        formats = ['Text file (*.txt)', 'Other (*.*)']
-
-        fname, extension = qw.QFileDialog.getOpenFileName(self,
-                                                          'Set wave file grid',
-                                                          self.model_folder,
-                                                          ';;'.join(formats))
-        if fname: 
-            self.load_depth_file(fname)
         
         
-    def set_initial_wave(self, value=None):
+    
+    def load_initial_wave_from_folder(self):     
+        # Check if a folder has already been specified
+        if self.initial_wave_folder is None:
+            initial = self.model_folder.value()
+        else:
+            initial = self.initial_wave_folder
+            
+        path = qw.QFileDialog.getExistingDirectory(self,
+                                                   'Select initial wave folder',
+                                                   initial)
+        if path:
+            # Remember the folder specified
+            self.initial_wave_folder = path
+            # Copy the files into the model folder
+            for p, v in [('ETA_FILE', 'eta'), ('U_FILE', 'Us'), ('V_FILE', 'Vs')]:
+                pass
+                # TODO, join this folder with p variable b
+            self.load_initial_wave()
         
-        self.restart_timestepper()        
-        self.results['depth'][self.pv('PLOT_START')] = heights
         
+    def load_initial_wave(self):        
+        self.restart_timestepper()     
+        
+        # Load the initial waves
+        start = self.pv('PLOT_START')        
+        for p, v in [('ETA_FILE', 'eta'), ('U_FILE', 'Us'), ('V_FILE', 'Vs')]:
+            path = os.path.join(self.model_folder.value(), self.pv(p))
+            if os.path.isfile(path):
+                self.results[v][start] = np.loadtxt(path)
+            else:
+                print(f'Specified {p} {self.pv(p)} not found at "{path}"')
+            
+        self.refresh_plots()
+        
+            
     def vector_output_changed(self):
         pass
+    
     
     def initial_wave_enabled_changed(self, value):
         for control in self.initial_wave_controls:

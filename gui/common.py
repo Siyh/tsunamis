@@ -9,7 +9,9 @@ from PyQt5.QtCore import (pyqtSignal,
                           Qt,
                           QParallelAnimationGroup,
                           QAbstractAnimation,
-                          QSize)
+                          QSize,
+                          #QObject)
+                          )
 import numpy as np
 import time
 
@@ -75,22 +77,26 @@ class DictionaryCombo(qw.QComboBox):
         
 class DoubleSlider(qw.QSlider):
     """
-    Extends a QSlider to use doubles as opposed to ints, and 
-    limits the selectable intervals to the tick marks using setInterval
+    Extends a QSlider to use doubles as opposed to ints.
+    It does this by converting the specified range and interval to integer
+    values that are used internally.
     """
 
-    def __init__(self, decimals=3, *args, **kargs):
+    def __init__(self, *args, **kargs):
         super(DoubleSlider, self).__init__( *args, **kargs)
-        self.minIndex = 0
-        self.maxIndex = 99
-        self.interval = 1
+        self.interval = 1        
         
-    def setValue(self, value):
-        index = round((value - self.minIndex) / self.interval)
-        return super(DoubleSlider, self).setValue(index)
-        
+        # The actual slider minimum is always zero so the index values work
+        super(DoubleSlider, self).setMinimum(0)
+        self._minimum = 0
+        self._maximum = 100
+    
     def value(self):
-        return self.index * self.interval + self.minIndex
+        return self.index * self.interval + self.minimum()
+    
+    def setValue(self, value):
+        index = round((value - self.minimum()) / self.interval)
+        return super(DoubleSlider, self).setValue(index)
     
     @property
     def index(self):
@@ -98,13 +104,30 @@ class DoubleSlider(qw.QSlider):
     
     def setIndex(self, index):
         return super(DoubleSlider, self).setValue(index)
-
-    def setMinimum(self, value):
-        self.minIndex = value
+    
+    @property
+    def maxIndex(self):
+        return super(DoubleSlider, self).maximum()
+    
+    def minimum(self):
+        return self._minimum  
+     
+    def setMinimum(self, value):        
+        self._minimum = value
         self._range_adjusted()
+        
+    def maximum(self):
+        return self._maximum
 
     def setMaximum(self, value):
-        self.maxIndex = value
+        span = value - self.minimum()
+        remainder = span % self.interval
+        if remainder:
+            # Make the range inclusive of the provided maximum value
+            value += self.interval - remainder
+            print(f'Maximum adjusted to {value} to match minimum and interval')
+        self._maximum = value
+        super(DoubleSlider, self).setMaximum((value - self.minimum()) / self.interval)
         self._range_adjusted()
     
     def setInterval(self, value):
@@ -115,8 +138,12 @@ class DoubleSlider(qw.QSlider):
         self._range_adjusted()
         
     def _range_adjusted(self):
-        number_of_steps = int((self.maxIndex - self.minIndex) / self.interval)
-        super(DoubleSlider, self).setMaximum(number_of_steps)
+        number_of_steps_f = (self.maximum() - self.minimum()) / self.interval
+        number_of_steps_i = int(number_of_steps_f)
+        if number_of_steps_f != number_of_steps_i:
+            print('Maximum range adjusted to match specified minimum value and interval')
+        
+        super(DoubleSlider, self).setMaximum(number_of_steps_i)
         
         #TODO try to maintain previous position
         self.setIndex(0)
@@ -356,16 +383,25 @@ class ResultReader(QThread):
         self.targets = []
         self.paths = []
         self.keys = []
-        
+        # To allow running to be paused (to queue stuff to read from multiple sources)
+        self.active = False        
 
     # def __del__(self):
     #     self.wait()
+    
+    def start(self):
+        if self.active:
+            super(ResultReader, self).start()
     
     
     def add_task(self, target, key, path):
         self.targets.append(target)
         self.keys.append(key)
         self.paths.append(path)
+        
+    def run_threads(self):
+        self.active = True
+        self.start()  
         
 
     def run(self):
@@ -382,6 +418,7 @@ class ResultReader(QThread):
         self.progress.emit(1, '{} Results loaded.'.format(n))        
         time.sleep(2)
         self.progress.emit(0, '')
+        
         
        
 class Spoiler(qw.QWidget):
@@ -462,6 +499,12 @@ class Spoiler(qw.QWidget):
         contentAnimation.setEndValue(contentHeight)
         
         
+# class EmittingStream(QObject):
+
+#     textWritten = pyqtSignal(str)
+
+#     def write(self, text):
+#         self.textWritten.emit(str(text))
         
         
 if __name__ == '__main__':

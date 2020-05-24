@@ -13,6 +13,13 @@ from pandas import read_table
 from tsunamis.utilities.io import read_configuration_file
 
 
+def sequence(start, step, number):
+    """
+    Gives a range with both end points based on the start, step and number
+    """
+    return np.linspace(start, step * number + start, number)
+
+
 class model:
     """
     NOTE beacuse of how nhwave and funwave handle depth grids, grids should be 
@@ -38,7 +45,8 @@ class model:
         
         print(f'Preparing {self.model}...')
         
-        self.parameters = parameters
+        # Copy any provided parameters so the original source can't get modified
+        self.parameters = {**parameters}
         self.results_folder = results_folder
         self.input_directory = input_directory
         
@@ -51,7 +59,6 @@ class model:
             self.source_executable_path = os.path.abspath(executable_path)
         else:
             self.source_executable_path = self.default_executable_path
-        self.executable_name = os.path.basename(self.source_executable_path)
         
         self.input_file = input_file
         self.depth_file = depth_file
@@ -59,7 +66,15 @@ class model:
         self.load_inputs()
         self.load_depth()
         
-
+    
+    @property
+    def results_path(self):
+        return os.path.join(self.output_directory, self.results_folder)
+    
+    @property
+    def depth_path(self):
+        return os.path.join(self.output_directory, self.depth_file)
+        
         
     def load_inputs(self, path=''):
         if not path: path = os.path.join(self.input_directory, self.input_file)
@@ -86,7 +101,8 @@ class model:
         self.write_depth()      
          
         # Copy the executable
-        self.target_executable_path = os.path.join(output_directory, self.executable_name)
+        self.target_executable_path = os.path.join(output_directory,
+                                                   os.path.basename(self.source_executable_path))
         copyfile(self.source_executable_path, self.target_executable_path)        
         
         if sys.platform == 'linux':
@@ -119,25 +135,22 @@ class model:
         
         
         
-    def run(self, output_directory=''):
+    def run(self):
         """Run the simulation with the given inputs"""
         
-        if not output_directory: output_directory = self.output_directory        
-        # Make the results folder if it doesn't already exist
-        results_directory = os.path.join(output_directory, self.results_folder)
-        if not os.path.isdir(results_directory):
-            os.mkdir(results_directory)
+        # Make the results folder if it doesn't already exist        
+        if not os.path.isdir(self.results_path): os.mkdir(self.results_path)
         
         n = int(self.parameters['PX']) * int(self.parameters['PY'])
         
-        command = 'mpirun -np {} "{}"'.format(n, self.target_executable_path)
+        command = f'mpirun -np {n} "{self.target_executable_path}"'
         
         # If this is running on Windows change the command appropriately
         if os.name == 'nt':
             command = 'wsl.exe ' + path_to_wsl(command)
-            input_path = output_directory.replace('\\', '/')
+            input_path = self.output_directory.replace('\\', '/')
         else:
-            input_path = output_directory
+            input_path = self.output_directory
             
          
         print(self.model + ' initiated with command:')
@@ -230,7 +243,7 @@ class model:
         """Display the results of the simulation run"""        
         #Load simulation output as a list of arrays
         depth = np.loadtxt(self.depth_path)
-        file_list = sorted(glob(self.results_dir + 'eta_*'),
+        file_list = sorted(glob(self.output_directory + 'eta_*'),
                 key=lambda name: int(name[-5:]))
         
         data = [np.zeros_like(depth)]
@@ -319,6 +332,8 @@ class model:
         
     def gs(self, xn, xd, xe=0):
         return np.linspace(0, int(xn) * float(xd), int(xn)) + float(xe)
+    
+
     
         
     def export(self, file_form, x0, y0, result_to_convert=False,

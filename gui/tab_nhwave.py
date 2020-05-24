@@ -17,6 +17,10 @@ class TabNHWAVE(TabModelBase):
         
         # Add varying bathymetry to the list of outputs to load
         self.result_types['depth'] = 'bathymetry'
+        # Add vertical velicoty to the list of outputs to load
+        #DEBUG removed to speed up loading during testing
+        #self.result_types['Ws'] = 'wave vector w component'
+
         
         super().__init__(parent)       
         
@@ -285,25 +289,29 @@ class TabNHWAVE(TabModelBase):
                 
         
     def send_wave_to_funwave(self):
-        # Get index of the result to convert
-        if self.final_wave.isChecked():
-            result_to_convert = self.timestepper.maxIndex + 1
-        else:
-            result_to_convert = self.timestepper.index + 1
-        
-        # Set the model outputs
-        self.set_model_inputs()
         funwave_tab = self.parent.tab_funwave
+        
+        # Get index of the result to convert
+        # don't need +1's here because the intial timestep is 0
+        if self.final_wave.isChecked():
+            result_to_convert = self.timestepper.maxIndex
+        else:
+            result_to_convert = self.timestepper.index
+            
+        # Set the model outputs
+        self.set_model_inputs()        
         funwave_tab.set_model_inputs()
-        
-        
-        
+
         # And convert
         self.model.nhw_to_funw(fwo=funwave_tab.model,
                                result_to_convert=result_to_convert)
         
         # And make the tab load the new wave
-        pass
+        funwave_tab.load_initial_wave()
+        
+    
+    def load_directory_extras(self):
+        self.recalculate_landslide()
         
     
     def vector_output_changed(self, _):

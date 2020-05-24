@@ -16,6 +16,8 @@ def run(config=r'C:\Users\Simon\Desktop\tsunami test\config.tsu'):
     # This needs to point to an argument to make it persistant
     window = TsunamiWindow(config)
     window.show()
+    # Delay the start of loading results until the GUI appears, otherwise it happens slower for some reason
+    window.reader.run_threads()
     
     # Start Qt event loop unless running in interactive mode or using pyside
     if (sys.flags.interactive != 1):# or not hasattr(pg.QtCore, 'PYQT_VERSION'):

@@ -8,11 +8,11 @@ from tsunamis.models.base import model
     
 class config(model):
     model = 'FUNWAVE'
-    default_executable_path = './executables/funwave'
+
     def __init__(self,
                  eta_file='eta.txt',
-                 u_file='u.txt',
-                 v_file='v.txt',
+                 u_file='Us.txt',
+                 v_file='Vs.txt',
                  **kwargs):
         
         super().__init__(**kwargs)

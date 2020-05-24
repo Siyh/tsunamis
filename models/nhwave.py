@@ -8,7 +8,7 @@ from glob import glob
 from shutil import copyfile
 from scipy.interpolate import griddata
 
-from tsunamis.models.base import model      
+from tsunamis.models.base import model, sequence
  
         
 class config(model):
@@ -35,9 +35,8 @@ class config(model):
         ncols, nrows, xllcorner, yllcorner, cellsize = head_vals   
 
         #Make lat long grid of depth
-        xl = self.gs(ncols, cellsize, xllcorner)
-        yl = self.gs(nrows, cellsize, yllcorner)[::-1] #index bit cos longitude
-        xs, ys = np.meshgrid(xl, yl)
+        xs, ys = np.meshgrid(sequence(xllcorner, cellsize, ncols),
+                             sequence(yllcorner, cellsize, nrows)[::-1]) #index bit cos longitude
         
         #Transform points to projected coordinates
         transformed = ccrs.epsg(epsg).transform_points(ccrs.PlateCarree(),
@@ -81,9 +80,10 @@ class config(model):
        
     def gen_ls(self, time):
         """Function to generate the landslide thicknesses""" 
-        x = self.gs(self.Mglob, self.DX)
-        y = self.gs(self.Nglob, self.DY)
-        lsxs, lsys = np.meshgrid(x, y)
+        lsxs, lsys = np.meshgrid(sequence(0, self.parameters['DX'],
+                                          self.parameters['Mglob']),
+                                 sequence(0, self.parameters['DY'],
+                                          self.parameters['Nglob']))
         
         #Rigid landslide 'lumpiness' parameter
         e = 0.717        
@@ -142,7 +142,7 @@ class config(model):
         #Get the number (with preceeding zeros) of the result to convert
         if result_to_convert is None:
             #List of the results
-            results = glob(self.results_dir + 'eta_*')
+            results = glob(self.results_path + 'eta_*')
             #Check there are some results to convert
             if not results:
                 print('No results to convert')
@@ -177,70 +177,55 @@ class config(model):
                 
             if fy0 is None:
                 fy0 = fwo.y0
-                if fy0 is None: raise Exception('FUNWAVE y0 not specified')            
+                if fy0 is None: raise Exception('FUNWAVE y0 not specified') 
+                
+            nmglob = self.parameters['Mglob']
+            fmglob = fwo.parameters['Mglob']
+            nnglob = self.parameters['Nglob']
+            fnglob = fwo.parameters['Nglob']
+            ndx = self.parameters['DX']
+            fdx = fwo.parameters['DX']
+            ndy = self.parameters['DY']
+            fdy = fwo.parameters['DY']
             
             
-            xl = list(self.gs(fwo.parameters['Mglob'],
-                              fwo.parameters['DX'], fx0))
-            yl = list(self.gs(fwo.parameters['Nglob'],
-                              fwo.parameters['DY'], fy0))      
+            xl = sequence(fx0, fdx, fmglob)
+            yl = sequence(fy0, fdy, fnglob)  
             
-            if ((self.depth.shape != fwo.depth.shape) and 
-                    (self.DX == fwo.DX) and
-                    (self.DY == fwo.DY) and
-                    #Points fit on linspace
-                    (nx0 in xl) and
-                    (ny0 in yl) or
-                    insert):
+            if (
+                    # If the grids are the same resolution
+                    (ndx == fdx) and (ndy == fdy) and
+                    # And the nhwave grid aligns with the funwave grid
+                    (nx0 in xl) and (ny0 in yl)
+                    
+                ):
+                
                 print('Common grid points')
                 insert = True
                 indices = np.zeros_like(fwo.depth, dtype=bool)
-                xi = xl.index(nx0)
-                yi = yl.index(ny0)
-                indices[yi:yi + self.parameters['Nglob'],
-                        xi:xi + self.parameters['Mglob']] = True
-                indices = np.where(indices)
+                xi = list(xl).index(nx0)
+                yi = list(yl).index(ny0)
+                indices[yi:yi + nnglob, xi:xi + nmglob] = True
+                pass
+                #indices = np.where(indices)
                 
             elif interpolate:
                 print('Interpolating grids')
                 #Make cartesian grid of nhwave files
-                """
-                #For rotating a grid
-                #Distance from x0, y0 location
-                xl = self.gs(self.Mglob, self.DX, 0)
-                yl = self.gs(self.Nglob, self.DY, 0)
-                xd, yd = np.meshgrid(xl, yl)
-                hx = int(self.Mglob) * float(self.DX) / 2
-                hy = int(self.Nglob) * float(self.DY) / 2
-                dx = xd - hx
-                dy = yd - hy
-                a = np.radians(rotation)            
-                xc = x0+hx + np.cos(a) * dx - np.sin(a) * dy
-                yc = y0+hy + np.sin(a) * dx + np.cos(a) * dy
-                """
-                xl = self.gs(self.parameters['Mglob'],
-                             self.parameters['DX'], nx0)
-                yl = self.gs(self.parameters['Nglob'],
-                             self.parameters['DY'], ny0)
-                xc, yc = np.meshgrid(xl, yl)
+                xc, yc = np.meshgrid(sequence(nx0, ndx, nmglob),
+                                     sequence(ny0, ndy, nnglob))
                 #Transform points to funwave crs
                 transformed = funw_crs.transform_points(nhw_crs, xc, yc)
                 xs = transformed[:, :, 0].flatten()
-                ys = transformed[:, :, 1].flatten()     
-                
-                #Make dimensions of grid for funwave files to be interpolated to
-                xx = self.gs(fwo.parameters['Mglob'],
-                             fwo.parameters['DX'], fx0)
-                yy = self.gs(fwo.parameters['Nglob'],
-                             fwo.parameters['DY'], fy0)
+                ys = transformed[:, :, 1].flatten()
             
         
         #For each grid to be copied
-        for f in ['eta', 'u', 'v']:
+        for f in ['eta', 'Us', 'Vs']:
             print(f'Interpolating "{f}" surface')
-            source_path = self.results_dir + f + f'_{result_to_convert:05d}'
+            source_path = os.path.join(self.results_path, f'{f}_{int(result_to_convert):05d}')
             #There are velocity values for each water layer, hence index bit
-            zs = np.loadtxt(source_path)[:self.parameters['Nglob']]
+            zs = np.loadtxt(source_path)[:nnglob]
             #Get rid of land elevation on wave data, except where wave over land
             if f == 'eta':
                 zs[(zs > 0) * (zs > self.depth)] = 0
@@ -248,7 +233,7 @@ class config(model):
             #mask spikes
             ############################
             zs[:, -1] = 0 ###### get rid of the source of spikes
-            zs[-1] = 0
+            #zs[-1] = 0
             ###########################
             if insert:
                 nzs = np.zeros_like(fwo.depth)
@@ -257,24 +242,19 @@ class config(model):
             elif interpolate:
                 #nan to num to convert points outside the funwave area,                
                 zs = np.nan_to_num(griddata((xs, ys), zs.flatten(),
-                        (xx[None,:], yy[:,None]), method=method))
+                                            (xl[None,:], yl[:,None]),
+                                            method=method))
                 
             np.savetxt(os.path.join(fwo.output_directory, f + '.txt'),
                        zs, fmt='%5.5g')
             setattr(fwo, f, zs)
-            #fwo.__dict__.update({f: zs})
+            
         
-        #Put a landslide lump on the bathymetry
+        # Put a landslide lump on the bathymetry
         if landslide:                      
-            #Manage a copy of the bathymetry without landslide data
+            # Make a copy of the bathymetry without landslide data
             dwlp = os.path.join(fwo.output_directory, 'depth_without_landslide.txt')
-            #If a landslide has already been added to the funwave depth file
-            if os.path.isfile(dwlp):
-                #Replace depth.txt with the depth without a landslide
-                copyfile(dwlp, fwo.depth_path)
-                #And reload the depth in the model
-                fwo.depth = np.loadtxt(fwo.depth_path)
-            else:
+            if not os.path.isfile(dwlp):
                 print('Saving a copy of the depth without a landslide')
                 #Save a copy of the depth without the landslide
                 copyfile(fwo.depth_path, dwlp)
@@ -286,17 +266,19 @@ class config(model):
             ndwlp = results_path + f'depth_{result_to_convert:05d}'
             landslide = np.loadtxt(ndwlp) - np.loadtxt(self.depth_path)
 
-            print('Adding a landslide to the depth file')  
-            #Add the landslide to funwaves depth
+            print('Adding a landslide to the depth file') 
+            # Replace any old landslide
+            if insert or interpolate: fwo.depth = np.loadtxt(dwlp)
+            # Add the landslide to funwaves depth
             if insert:
                 fwo.depth[indices] -= landslide.flatten()
             elif interpolate:
-                #nan to num to convert points outside the funwave area,                
+                # nan to num to convert points outside the funwave area,                
                 fwo.depth -= np.nan_to_num(griddata((xs, ys),
                         landslide.flatten(),
-                        (xx[None,:], yy[:,None]), method=method))
+                        (xl[None,:], yl[:,None]), method=method))
             
-            #Replace funwaves depth.txt file
+            # Replace funwaves depth.txt file
             np.savetxt(fwo.depth_path, fwo.depth, fmt='%5.5g')
             
     
