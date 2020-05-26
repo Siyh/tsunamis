@@ -505,7 +505,8 @@ class Spoiler(qw.QWidget):
 
 #     def write(self, text):
 #         self.textWritten.emit(str(text))
-        
+
+
         
 if __name__ == '__main__':
     from run_gui import run

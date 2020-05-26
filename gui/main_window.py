@@ -57,9 +57,8 @@ class TsunamiWindow(qw.QMainWindow):
         self.tabs.addTab(self.tab_nhwave, 'NHWAVE')
         self.tabs.addTab(self.tab_funwave, 'FUNWAVE')
         
-        # Temporarily set NHWAVE as the selected tab on opening
+        # Set NHWAVE as the selected tab on opening
         self.tabs.setCurrentIndex(1)   
-
         
         self.statusBar = qw.QStatusBar()
         self.progressBar = qw.QProgressBar()

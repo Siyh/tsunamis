@@ -72,7 +72,7 @@ class TabFUNWAVE(TabModelBase):
                        {'Runge Kutta':'Runge_Kutta'})
         
         self.create_input_group('Outputs')
-        self.add_input('water depth', 'OUT_H', True,
+        self.add_input('water depth', 'ETA', True,
                        function=self.display_wave_height.setEnabled)
         self.add_input('velocity in x direction', 'U', True,
                        function=self.vector_output_changed)

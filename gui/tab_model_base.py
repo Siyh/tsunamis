@@ -3,6 +3,8 @@
 
 from PyQt5 import QtWidgets as qw
 from PyQt5.QtCore import Qt
+from PyQt5 import QtGui
+
 import numpy as np
 import os
 import requests
@@ -12,8 +14,11 @@ from glob import glob
 
 
 from mayavi_widget import MayaviQWidget, mlab
-from common import WidgetMethods, build_wms_url, DoubleSlider, sigfigs
+from common import WidgetMethods, build_wms_url, DoubleSlider, TextOverlay
 from tsunamis.utilities.io import read_configuration_file
+
+
+
 
 class TabModelBase(qw.QSplitter, WidgetMethods):    
 
@@ -47,7 +52,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.config_input_scroller.setMinimumWidth(400)
         
         viewer = qw.QWidget()
-        self.plot = MayaviQWidget(self)
+        self.plot = MayaviQWidget(self)        
+        
         plot_controls = qw.QWidget()
         
         # Arrange them
@@ -56,8 +62,14 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         viewersplit.addWidget(plot_controls)
         viewer.setLayout(viewersplit)
         
+        self.console = qw.QTextEdit()
+        self.console.setReadOnly(True)
+        self.console.setFont(QtGui.QFont('Consolas', 10)) 
+        self.console.hide()
+        
         self.addWidget(self.config_input_scroller)
         self.addWidget(viewer)   
+        self.addWidget(self.console)
         
         steppersplit = qw.QVBoxLayout()
         plot_buttons = qw.QWidget()
@@ -489,16 +501,25 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         return self.parameters[parameter].value()
     
     
-    def run_model_clicked(self):
+    def write_to_console(self, text):
+        # TODO this should really be a signal slot
+        self.console.moveCursor(QtGui.QTextCursor.End)
+        self.console.insertPlainText(text)
+        
+    def model_run_finished(self):
+        self.load_results()
+        self.console.hide()
+    
+    def run_model_clicked(self):        
+        self.console.setText(self.model.model + ' initialising...\n')
+        self.console.show()
+        
         # Ouputs inputs
         self.write_model_inputs()
         
         # And run
-        run = self.model.run()
-        
-        # Load the results if the run was successful
-        if run: self.load_results()
-        
+        self.model.run(self.write_to_console, self.load_results)  
+   
     
     def write_model_inputs(self):
         self.set_model_inputs()        

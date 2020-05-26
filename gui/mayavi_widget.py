@@ -74,8 +74,7 @@ class MayaviQWidget(QtGui.QWidget):
         
         # Set up the data links
         self.figure = self.visualization.scene.mayavi_scene
-        
-        
+
         #Add time title
         self.timestep_label = tvtk.TextActor(
             input='0:00:00',

@@ -5,11 +5,13 @@ import os, sys
 import numpy as np
 import matplotlib.pyplot as plt
 from glob import glob
-from shutil import copyfile
+from shutil import copy2
 from subprocess import Popen, PIPE
 from stat import S_IEXEC
 from matplotlib.widgets import Slider, Button, RadioButtons
 from pandas import read_table
+from threading import Thread 
+
 from tsunamis.utilities.io import read_configuration_file
 
 
@@ -103,7 +105,7 @@ class model:
         # Copy the executable
         self.target_executable_path = os.path.join(output_directory,
                                                    os.path.basename(self.source_executable_path))
-        copyfile(self.source_executable_path, self.target_executable_path)        
+        copy2(self.source_executable_path, self.target_executable_path)        
         
         if sys.platform == 'linux':
             # Give the program the relevant permissions
@@ -134,9 +136,15 @@ class model:
         np.savetxt(path, self.depth, fmt='%5.1f')
         
         
-        
-    def run(self):
-        """Run the simulation with the given inputs"""
+    def run(self,
+            console_text_target=None,
+            on_finish=None):
+        """
+        Run the simulation with the given inputs.
+        console_text_target is a function that should be passed a string
+        on_finish should be a function called when the model run finishes     
+        both or neither should be provided
+        """
         
         # Make the results folder if it doesn't already exist        
         if not os.path.isdir(self.results_path): os.mkdir(self.results_path)
@@ -150,22 +158,26 @@ class model:
             command = 'wsl.exe ' + path_to_wsl(command)
             input_path = self.output_directory.replace('\\', '/')
         else:
-            input_path = self.output_directory
-            
+            input_path = self.output_directory            
          
         print(self.model + ' initiated with command:')
-        print(command + '\nin:\n' + input_path)
-        print(self.model + 'output:')
+        print(command + '\nin:\n' + input_path)        
         
-        p = Popen(command, shell=True, cwd=input_path, stdout=PIPE)
+        p = Popen(command, shell=False, cwd=input_path, stdout=PIPE)
         
-        # Write the output to Python stdout
-        for c in iter(lambda: p.stdout.read(1), b''):
-            sys.stdout.write(c)
+        if console_text_target is None:
+            print(self.model + ' output:')
+            # Write the output to Python stdout
+            for c in iter(lambda: p.stdout.read(1), b''):
+                sys.stdout.write(c)
+        else:
+            t = Thread(target=output_reader,
+                       args=(p, console_text_target, on_finish))
+            t.start()
         
-        return True
-    
-                
+        if on_finish is None:
+            return True
+
 
                 
     def xyz_to_grid(self, xyz_path, elevation=True):
@@ -400,6 +412,12 @@ def path_to_wsl(path):
         letter = path[coloni - 1].lower()
         path = path[:coloni - 1] + '/mnt/' + letter + path[coloni + 1:]                
     return path
+
+
+def output_reader(process, output, finish):
+    for line in iter(process.stdout.readline, b''):
+        output(line.decode('utf-8'))    
+    finish()
 
         
         
