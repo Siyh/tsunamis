@@ -62,10 +62,7 @@ class TabNHWAVE(TabModelBase):
         # self.add_input('Cf_ul', 'Cf_ul', 0.02)
         # self.add_input('PhiInt', 'PhiInt', 41.0)
         # self.add_input('PhiBed', 'PhiBed', 23.0)
-        # self.add_input('Use rheology', 'RHEOLOGY_ON', False)
-        # self.add_input('Yield stress', 'Yield_Stress', 10.0)
-        # self.add_input('Plastic viscosity', 'Plastic_Visc', 0.0)   
-        
+
         self.landslide_volume = qw.QLabel()
         self.add_input('Landslide Volume', widget=self.landslide_volume, function=False)        
         self.add_button('Output landslide thickness', self.output_landslide)
@@ -131,6 +128,14 @@ class TabNHWAVE(TabModelBase):
         self.add_input('Wind speed', 'Iws', ['constant', 'variable'])
         self.add_input('WindU', 'WindU', 0.0)
         self.add_input('WindV', 'WindV', 0.0)
+        self.finish_dropdown()
+        
+        self.start_dropdown('Rheology')
+        self.add_input('Use rheology', 'RHEOLOGY_ON', False,
+                       function=self.rheology_enabled_changed)        
+        self.yield_stress = self.add_input('Yield stress', 'Yield_Stress', 10.0)
+        self.plastic_viscosity = self.add_input('Plastic viscosity', 'Plastic_Visc', 0.0) 
+        self.rheology_enabled_changed(False)
         self.finish_dropdown()
         
         self.start_dropdown('To sort')
@@ -275,17 +280,22 @@ class TabNHWAVE(TabModelBase):
         self.recalculate_landslide()
         
         # Controls for sending the wave to FUNWAVE
-        misc = self.misc_options.layout()
+        l = self.rhs_buttons.layout()
         self.final_wave = qw.QRadioButton('Final Wave')
         self.final_wave.setChecked(True)
-        misc.addWidget(self.final_wave)
+        l.addWidget(self.final_wave)
 
         current_wave = qw.QRadioButton('Current Wave')
-        misc.addWidget(current_wave)
+        l.addWidget(current_wave)
         
         button = qw.QPushButton('Send wave to FUNWAVE')
         button.clicked.connect(self.send_wave_to_funwave)
-        misc.addWidget(button)
+        l.addWidget(button)
+        
+        
+    def rheology_enabled_changed(self, value):
+        self.yield_stress.setEnabled(value)
+        self.plastic_viscosity.setEnabled(value)
                 
         
     def send_wave_to_funwave(self):
@@ -358,7 +368,7 @@ class TabNHWAVE(TabModelBase):
         
     def output_landslide(self):
         blob = self.generate_landslide_blob()
-        np.savetxt(os.path.join(self.model_folder, 'SlideThickness.txt'), blob)
+        np.savetxt(os.path.join(self.model_folder.value(), 'SlideThickness.txt'), blob)
         
         
     def generate_landslide_blob(self):

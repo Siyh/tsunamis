@@ -410,12 +410,12 @@ class ResultReader(QThread):
                                                     self.keys,
                                                     self.paths)):
             # Load the data
-            target[key] = np.loadtxt(path)
+            target[key] = np.nan_to_num(np.loadtxt(path))
             
             # Report the progress
             self.progress.emit(i / n, 'Loading: ' + path)
             
-        self.progress.emit(1, '{} Results loaded.'.format(n))        
+        self.progress.emit(1, f'{n} Results loaded.')        
         time.sleep(2)
         self.progress.emit(0, '')
         

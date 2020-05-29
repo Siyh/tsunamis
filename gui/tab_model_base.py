@@ -14,7 +14,7 @@ from glob import glob
 
 
 from mayavi_widget import MayaviQWidget, mlab
-from common import WidgetMethods, build_wms_url, DoubleSlider, TextOverlay
+from common import WidgetMethods, build_wms_url, DoubleSlider
 from tsunamis.utilities.io import read_configuration_file
 
 
@@ -65,11 +65,11 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.console = qw.QTextEdit()
         self.console.setReadOnly(True)
         self.console.setFont(QtGui.QFont('Consolas', 10)) 
-        self.console.hide()
-        
+ 
         self.addWidget(self.config_input_scroller)
         self.addWidget(viewer)   
-        self.addWidget(self.console)
+        self.addWidget(self.console)        
+        
         
         steppersplit = qw.QVBoxLayout()
         plot_buttons = qw.QWidget()
@@ -90,23 +90,10 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.display_wave_vectors = self.add_input('Wave vectors', value=False,
                                                    function=self.display_wave_vectors_changed)
         
-        self.misc_options = self.create_input_group('',
-                                                    main_layout=False)
-        self.vertical_exaggeration = self.add_input('Vertical exaggeration', value=10,
-                                                    function=self.plot.set_vertical_exaggeration)
         
-        self.plot.set_vertical_exaggeration(10)
 
-        
-        stepper_buttons = qw.QHBoxLayout()
-        stepper_buttons.setAlignment(Qt.AlignRight)
-        plot_control_layout = qw.QHBoxLayout()
-        plot_control_layout.addWidget(self.plot_options)
-        plot_control_layout.addWidget(self.misc_options)
-        plot_control_layout.addLayout(stepper_buttons)
-        plot_buttons.setLayout(plot_control_layout)
-        
         self.play_pause_button = qw.QPushButton() 
+        self.playing = False
         self.set_button_icon(self.play_pause_button, 'SP_MediaPlay')
         next_step = qw.QPushButton() 
         self.set_button_icon(next_step, 'SP_MediaSeekForward')
@@ -120,13 +107,37 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         previous_step.clicked.connect(self.previous_timestep)
         restart.clicked.connect(self.restart_timestepper)
         
+        stepper_buttons = qw.QHBoxLayout()
+        stepper_buttons.setAlignment(Qt.AlignRight)
         stepper_buttons.addWidget(restart)
         stepper_buttons.addWidget(previous_step)
         stepper_buttons.addWidget(next_step)
         stepper_buttons.addWidget(self.play_pause_button)
         
+        display_options = self.create_input_group('Display options',
+                                               main_layout=False)        
+        display_options.layout().addLayout(stepper_buttons)        
+        self.vertical_exaggeration = self.add_input('Vertical exaggeration', value=10,
+                                                    function=self.plot.set_vertical_exaggeration)        
+        self.plot.set_vertical_exaggeration(10)
         
-        self.playing = False
+        
+        self.rhs_buttons = self.create_input_group(self.model.model + ' controls',
+                                                   main_layout=False)
+        self.run_button = self.add_button('Run ' + self.model.model, self.run_model_clicked)  
+        self.console_toggle = self.add_button('Show console output', self.toggle_console)
+        self.console.hide() 
+
+
+        
+        plot_control_layout = qw.QHBoxLayout()
+        plot_control_layout.addWidget(self.plot_options)
+        plot_control_layout.addWidget(display_options)
+        plot_control_layout.addWidget(self.rhs_buttons)
+        plot_buttons.setLayout(plot_control_layout)        
+        
+                
+        
         
         #=====================================================================
         # Setup inputs
@@ -134,7 +145,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         #TODO set tooltips using .setToolTip
         self.create_input_group('General')        
-        self.add_button('Run ' + self.model.model, self.run_model_clicked)  
+        
         self.add_button('Write model inputs', self.write_model_inputs)
         
         desktop = os.path.join(os.environ['USERPROFILE'],
@@ -251,8 +262,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # Done on existing keys in case this ever changes
         for result in self.results:
             # Create an empty dictionary to hold the results
-            self.results[result] = {t: None for t in self.timesteps}
-            
+            self.results[result] = {t: None for t in self.timesteps}            
         
         
     def total_time_changed(self, value):
@@ -500,6 +510,16 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         """
         return self.parameters[parameter].value()
     
+    def toggle_console(self):
+        if self.console.isVisible():
+            self.console.hide()   
+            self.console_toggle.setText('Show console output')
+        else:
+            self.show_console()
+            
+    def show_console(self):
+        self.console.show()
+        self.console_toggle.setText('Hide console output')
     
     def write_to_console(self, text):
         # TODO this should really be a signal slot
@@ -507,19 +527,28 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.console.insertPlainText(text)
         
     def model_run_finished(self):
+        #TODO load results progressively
         self.load_results()
-        self.console.hide()
+        self.hide_console()
     
     def run_model_clicked(self):        
-        self.console.setText(self.model.model + ' initialising...\n')
-        self.console.show()
         
-        # Ouputs inputs
-        self.write_model_inputs()
-        
-        # And run
-        self.model.run(self.write_to_console, self.load_results)  
-   
+        if self.model.linux_link.running:
+            self.model.linux_link.terminate()
+            self.run_button.setText('Run ' + self.model.model)
+            
+        else:
+            self.show_console()
+            self.console.setText(self.model.model + ' initialising...\n')            
+            
+            # Ouputs inputs
+            self.write_model_inputs()
+            
+            # And run
+            self.model.run(self.write_to_console)  
+            
+            self.run_button.setText('Stop ' + self.model.model)
+               
     
     def write_model_inputs(self):
         self.set_model_inputs()        

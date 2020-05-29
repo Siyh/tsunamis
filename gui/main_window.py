@@ -157,6 +157,10 @@ class TsunamiWindow(qw.QMainWindow):
         self.settings.setValue('geometry', self.saveGeometry())
         # Close the mayavi instances
         mlab.close(all=True)
+        # Close any running linux links
+        for tab in [self.tab_nhwave, self.tab_funwave]:
+            tab.model.linux_link.terminate()     
+                
         print('Tsunami window closed')
         qw.QApplication.quit()        
 
