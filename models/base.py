@@ -49,7 +49,7 @@ class model:
         
         # Copy any provided parameters so the original source can't get modified
         self.parameters = {**parameters}
-        self.results_folder = results_folder
+        self.parameters['RESULT_FOLDER'] = results_folder
         self.input_directory = input_directory
         
         if output_directory:
@@ -63,7 +63,9 @@ class model:
             self.source_executable_path = self.default_executable_path
         
         self.input_file = input_file
-        self.depth_file = depth_file
+        self.parameters['DEPTH_FILE'] = depth_file
+        
+        self.linux_link = WSLlink()
         
         self.load_inputs()
         self.load_depth()
@@ -74,8 +76,16 @@ class model:
         return os.path.join(self.output_directory, self.results_folder)
     
     @property
+    def results_folder(self):
+        return self.parameters['RESULT_FOLDER']
+    
+    @property
     def depth_path(self):
         return os.path.join(self.output_directory, self.depth_file)
+    
+    @property
+    def depth_file(self):
+        return self.parameters['DEPTH_FILE']
         
         
     def load_inputs(self, path=''):
@@ -105,7 +115,8 @@ class model:
         # Copy the executable
         self.target_executable_path = os.path.join(output_directory,
                                                    os.path.basename(self.source_executable_path))
-        copy2(self.source_executable_path, self.target_executable_path)        
+        if not os.path.isfile(self.target_executable_path):
+            copy2(self.source_executable_path, self.target_executable_path)        
         
         if sys.platform == 'linux':
             # Give the program the relevant permissions
@@ -137,13 +148,9 @@ class model:
         
         
     def run(self,
-            console_text_target=None,
-            on_finish=None):
+            console_text_target=None):
         """
         Run the simulation with the given inputs.
-        console_text_target is a function that should be passed a string
-        on_finish should be a function called when the model run finishes     
-        both or neither should be provided
         """
         
         # Make the results folder if it doesn't already exist        
@@ -170,13 +177,12 @@ class model:
             # Write the output to Python stdout
             for c in iter(lambda: p.stdout.read(1), b''):
                 sys.stdout.write(c)
+            return True
         else:
-            t = Thread(target=output_reader,
-                       args=(p, console_text_target, on_finish))
+            t = Thread(target=self.linux_link.run,
+                       args=(p, console_text_target))
             t.start()
         
-        if on_finish is None:
-            return True
 
 
                 
@@ -414,10 +420,27 @@ def path_to_wsl(path):
     return path
 
 
-def output_reader(process, output, finish):
-    for line in iter(process.stdout.readline, b''):
-        output(line.decode('utf-8'))    
-    finish()
+class WSLlink:       
+    def __init__(self):
+        self.running = False
+        
+    def run(self, process, output):
+        self.running = True
+        self.output = output
+        
+        for line in iter(process.stdout.readline, b''):
+            
+            if not self.running:
+                output('WSL link terminated.')
+                return
+            
+            output(line.decode('utf-8'))            
+            
+            
+    def terminate(self):
+        if self.running:
+            self.output('WSL link termination called...\n')
+            self.running = False
 
         
         

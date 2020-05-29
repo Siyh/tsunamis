@@ -138,7 +138,6 @@ class config(model):
                 Defaults to the maximum number.
         method = method of interpolation (see scipy griddata).
         """
-        #TODO implement getting x0s and y0s from surface inputs
         #Get the number (with preceeding zeros) of the result to convert
         if result_to_convert is None:
             #List of the results
@@ -150,19 +149,23 @@ class config(model):
             #Find the largest file number to convert
             result_to_convert = int(max(results)[-5:])
                    
-        print('Interpolating nhwave grids to funwave grids')        
-    
-        
+        print('Interpolating nhwave outputs to funwave inputs')
         
         #Check what transformation is necessary
         if np.array_equal(self.depth, fwo.depth):
             print('Grids are in the same place')
         else:
             # Define coordinate systems
-            if not funw_crs: funw_crs = ccrs.PlateCarree()
-            if isinstance(funw_crs, int): funw_crs = ccrs.epsg(funw_crs)
-            if isinstance(nhw_crs, int): nhw_crs = ccrs.epsg(nhw_crs)
+            if nhw_crs is None:
+                nhw_crs = ccrs.PlateCarree()
+            elif isinstance(nhw_crs, int):
+                nhw_crs = ccrs.epsg(nhw_crs)            
+            if funw_crs is None:
+                funw_crs = ccrs.PlateCarree()
+            elif isinstance(funw_crs, int):
+                funw_crs = ccrs.epsg(funw_crs)
             
+            # Get location of each grid
             if nx0 is None:
                 nx0 = self.x0
                 if nx0 is None: raise Exception('NHWAVE x0 not specified')
@@ -198,16 +201,15 @@ class config(model):
                     # And the nhwave grid aligns with the funwave grid
                     (nx0 in xl) and (ny0 in yl)
                     
-                ):
-                
-                print('Common grid points')
+                ):                
+                print('Offset grids')
+                # Get a boolean array of where the funwave grid shares the 
+                # location of the nhwave grid
                 insert = True
                 indices = np.zeros_like(fwo.depth, dtype=bool)
                 xi = list(xl).index(nx0)
                 yi = list(yl).index(ny0)
                 indices[yi:yi + nnglob, xi:xi + nmglob] = True
-                pass
-                #indices = np.where(indices)
                 
             elif interpolate:
                 print('Interpolating grids')
@@ -251,34 +253,39 @@ class config(model):
             
         
         # Put a landslide lump on the bathymetry
-        if landslide:                      
-            # Make a copy of the bathymetry without landslide data
-            dwlp = os.path.join(fwo.output_directory, 'depth_without_landslide.txt')
-            if not os.path.isfile(dwlp):
-                print('Saving a copy of the depth without a landslide')
-                #Save a copy of the depth without the landslide
-                copyfile(fwo.depth_path, dwlp)
+        if landslide:       
+            # Get the landslide thickness by subtracting the depth from the landslide
+            landslide_depth = os.path.join(self.results_path, f'depth_{int(result_to_convert):05d}')
+            landslide_thickness = np.loadtxt(landslide_depth) - np.loadtxt(self.depth_path)
+            
+            # Get the funwave depth without a landslide
+            # If there is already a landslide on the current depth
+            if 'DepthWithoutLandslide' in fwo.parameters:     
+                # Load the depth without a landslide
+                depth_without_landslide_path = os.path.join(fwo.output_directory,
+                                                            fwo.parameters['DepthWithoutLandslide'])
+                fwo.depth = np.loadtxt(depth_without_landslide_path)
                 
-            # Get a copy of the landslide thickness by subtracting the depth 
-            # from the landslide
-            results_path = os.path.join(self.output_directory,
-                                        self.parameters['RESULT_FOLDER'])
-            ndwlp = results_path + f'depth_{result_to_convert:05d}'
-            landslide = np.loadtxt(ndwlp) - np.loadtxt(self.depth_path)
-
+            else:
+                # Otherwise load the depth file
+                fwo.depth = np.loadtxt(fwo.depth_path)
+                # Remember the path to it
+                fwo.parameters['DepthWithoutLandslide'] = fwo.parameters['DEPTH_FILE']
+                # And remember the new depth file
+                fwo.parameters['DEPTH_FILE'] = fwo.depth_path.replace('.txt', '_with_landslide.txt')
+                
             print('Adding a landslide to the depth file') 
-            # Replace any old landslide
-            if insert or interpolate: fwo.depth = np.loadtxt(dwlp)
+                
             # Add the landslide to funwaves depth
             if insert:
-                fwo.depth[indices] -= landslide.flatten()
+                fwo.depth[indices] -= landslide_thickness.flatten()
             elif interpolate:
                 # nan to num to convert points outside the funwave area,                
                 fwo.depth -= np.nan_to_num(griddata((xs, ys),
-                        landslide.flatten(),
+                        landslide_thickness.flatten(),
                         (xl[None,:], yl[:,None]), method=method))
             
-            # Replace funwaves depth.txt file
+            # Replace funwaves depth file
             np.savetxt(fwo.depth_path, fwo.depth, fmt='%5.5g')
             
     
