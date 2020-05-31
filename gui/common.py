@@ -147,52 +147,52 @@ class DoubleSlider(qw.QSlider):
         
         #TODO try to maintain previous position
         self.setIndex(0)
-
-
-class WidgetMethods:
-    
-    def create_input_group(self, title, function=None, main_layout=True):
-        """
-        Creates a vertical list upon which to place buttons and labelled widgets.
-        If a function is given, it is called whenever one of the input group changes.
-        """
-        gb = qw.QGroupBox(title)
-        self._current_input_group = qw.QVBoxLayout()
-        gb.setLayout(self._current_input_group)     
-        if main_layout:
-            self.input_layout.addWidget(gb)
-        self._current_input_group_function = function
-        return gb
-    
-    
-    def start_dropdown(self, title, function=None, main_layout=True):
-        """
-        Creates a vertical list upon which to place buttons and labelled widgets.
-        If a function is given, it is called whenever one of the input group changes.
-        """
-        self._current_dropdown = Spoiler(title=title)
-        self._current_input_group = qw.QVBoxLayout()        
-        self._current_input_group_function = function
-        if main_layout:
-            self.input_layout.addWidget(self._current_dropdown)
         
-    
-    def finish_dropdown(self):
-        # TODO change this to use a with statement
-        self._current_dropdown.setContentLayout(self._current_input_group)   
         
+        
+class InputGroup(qw.QVBoxLayout):
     
-    
+    def __init__(self,
+                 parent_tab,
+                 title,
+                 function=None,
+                 main_layout=True,
+                 dropdown=False,
+                 enabled=True):
+        
+        super(qw.QVBoxLayout, self).__init__()
+        
+        self.parent_tab = parent_tab
+        
+        # Create the widget containing this layout
+        if dropdown:
+            self.widget = Spoiler(title=title)
+        else:
+            self.widget = qw.QGroupBox(title)   
+        self.dropdown = dropdown
+        
+        self.widget.setLayout(self)
+        if main_layout:
+            parent_tab.input_layout.addWidget(self.widget)
+            
+        self.function = function
+        self.enabled = enabled
+        self.widgets = []
+        
+        
     def add_input(self,
                   label,
                   model_varb_name='',
                   value=None,
                   widget=None,
+                  editable=True,
                   default=None,
                   function=None,
                   layout=None,
                   dialogue_label='',        
-                  formats=''):  
+                  formats='',
+                  group_enabler=False,
+                  enabled=None):  
         """
         Labels a widget and adds it to the input group. The widget type
         depends on the value used unless a widget is specified. 
@@ -213,6 +213,8 @@ class WidgetMethods:
             value for the input. 
         widget : pyqt widget, optional
             widget to attach the label to. The default is None.
+        editable : bool
+            if false, the widget is just text that cannot be edited from the GUI
         default :  optional
             Only used if the value was a dict. The default is None.
         function : function, optional
@@ -238,24 +240,27 @@ class WidgetMethods:
 
         Returns
         -------
-        None.
+        the widget.
 
         """
 
         # Create a widget based on the value type
         # Map the getting and setting of values to a common method
-        if widget is None:            
+        if widget is None:    
             if isinstance(value, bool):
                 widget = qw.QCheckBox()
                 widget.valueChanged = widget.stateChanged
                 widget.setValue = widget.setChecked
                 widget.value = widget.isChecked
+                if group_enabler:
+                    widget.valueChanged.connect(lambda: self.enabled_changed(widget.value()))
+                    self.enabled = value
             elif isinstance(value, int):
                 widget = qw.QSpinBox()
                 widget.setRange(0, 2147483647)
             elif isinstance(value, float):
                 widget = qw.QDoubleSpinBox()
-                widget.setRange(0, 1E10)                
+                widget.setRange(0, 1E10)    
             elif isinstance(value, (dict, list)):                
                 widget = DictionaryCombo()
                 widget.assign_content(value)
@@ -284,22 +289,23 @@ class WidgetMethods:
                 
         # Remember the widget acoording the model variable name, so the values
         # can be looked up when the model inputs are output
-        if model_varb_name: self.parameters[model_varb_name] = widget 
-        
-        # Add it to the input list if desired
-        if layout is None: layout = self._current_input_group
-        layout.addLayout(hbox)
+        if model_varb_name:
+            self.parent_tab.parameters[model_varb_name] = widget 
         
         # Link it to a function if desired
-        #if hasattr(widget, 'valueChanged'):
-        if function is None:
-            if self._current_input_group_function is not None:
-                widget.valueChanged.connect(self._current_input_group_function)
-        elif function:
-            # The lamda function means the called function will be passed
-            # the new value of the widget when it changes
-            widget.valueChanged.connect(lambda: function(widget.value()))
-            
+        if editable:
+            if function is None:
+                if self.function is not None:
+                    widget.valueChanged.connect(self.function)
+            elif function:
+                # The lamda function means the called function will be passed
+                # the new value of the widget when it changes
+                widget.valueChanged.connect(lambda: function(widget.value()))
+        else:
+            widget.setReadOnly(True)
+            if hasattr(widget, 'setButtonSymbols'):
+                widget.setButtonSymbols(2) # 2 is no buttons
+
         # Add a button to open a file/folder directory if desired
         if dialogue_label:
             button = qw.QPushButton()  
@@ -308,15 +314,57 @@ class WidgetMethods:
             if formats:            
                 icon = 'SP_FileIcon'
                 if formats == 'txt': formats = 'Text file (*.txt);;Other (*.*)'
-                f = lambda: self.file_dialogue(dialogue_label, formats, widget)                
+                f = lambda: self.parent_tab.file_dialogue(dialogue_label, formats, widget)                
             else:
                 icon = 'SP_DirOpenIcon'
-                f = lambda: self.folder_dialogue(dialogue_label, widget) 
+                f = lambda: self.parent_tab.folder_dialogue(dialogue_label, widget) 
             
-            self.set_button_icon(button, icon=icon)
+            self.parent_tab.set_button_icon(button, icon=icon)
             button.clicked.connect(f)
+            
+        # Add it to the input list
+        self.addLayout(hbox)
+        if self.dropdown:
+            # Let the dropdown know how bif it needs to be
+            self.widget.setContentLayout(self)        
+        
+        if not group_enabler:
+            # Set enabled if specific settings were given
+            if enabled is not None:
+                widget.setEnabled(enabled)
+            # Or set according to the group settings
+            elif not self.enabled:
+                widget.setEnabled(False)
+            #Remember the widget so it can be enabled/disabled
+            self.widgets.append(widget)
 
         return widget
+    
+    def enabled_changed(self, value):
+        for widget in self.widgets:
+            widget.setEnabled(value)
+
+        
+    def add_button(self, label=None, function=None, icon=None, enabled=True):
+        """
+        Adds a button to the vertical list
+        """
+        button = qw.QPushButton(label)
+        button.clicked.connect(function)
+        if icon is not None:
+            self.parent_tab.set_button_icon(button, icon)
+            
+        self.addWidget(button)
+        
+        # Disable or enable, overwriting group settings
+        button.setEnabled(enabled)
+        
+        return button
+    
+        
+        
+class WidgetMethods:
+   
     
     
     def folder_dialogue(self, label, target):
@@ -337,18 +385,7 @@ class WidgetMethods:
             target.setValue(path)
         
         
-    def add_button(self, label=None, function=None, icon=None):
-        """
-        Adds a button to the vertical list
-        """
-        button = qw.QPushButton(label)
-        button.clicked.connect(function)
-        if icon is not None:
-            self.set_button_icon(button, icon)
-            
-        self._current_input_group.addWidget(button)
-        return button
-    
+
     
     def set_button_icon(self, button, icon='SP_DirOpenIcon'):
         button.setIcon(self.style().standardIcon(getattr(qw.QStyle, icon)))

@@ -43,10 +43,14 @@ def read_results(target, timesteps, file_list, result_type):
     n = len(file_list)
     with Pool() as pool:        
         for i, (time, result) in enumerate(zip(timesteps,
-                                               pool.imap(np.loadtxt, file_list))):
+                                               pool.imap(read_grid, file_list))):
            print('\rLoading {} {} of {}'.format(result_type, i + 1, n), end='')
            target[time] = result
         print()
+        
+        
+def read_grid(path):
+    return np.loadtxt(path)
         
         
         

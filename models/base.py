@@ -12,7 +12,7 @@ from matplotlib.widgets import Slider, Button, RadioButtons
 from pandas import read_table
 from threading import Thread 
 
-from tsunamis.utilities.io import read_configuration_file
+from tsunamis.utilities.io import read_configuration_file, read_grid
 
 
 def sequence(start, step, number):
@@ -100,7 +100,7 @@ class model:
         if not path: path = os.path.join(self.input_directory, self.depth_file)
         if not os.path.exists(path): return
         
-        self.depth = np.loadtxt(path)
+        self.depth = read_grid(path)
         
         
                         

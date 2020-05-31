@@ -5,7 +5,6 @@ import os
 import numpy as np
 import cartopy.crs as ccrs
 from glob import glob
-from shutil import copyfile
 from scipy.interpolate import griddata
 
 from tsunamis.models.base import model, sequence

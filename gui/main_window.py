@@ -36,7 +36,7 @@ class TsunamiWindow(qw.QMainWindow):
         # Setup the thread for reading results. This is done in a separate 
         # thread so the gui doesn't hang
         self.reader = ResultReader()
-        self.reader.progress.connect(self.progress)
+        self.reader.progress.connect(self.progress_slot)
         
         #======================================================================
         # Setup the window contents
@@ -147,9 +147,14 @@ class TsunamiWindow(qw.QMainWindow):
         
         
     @QtCore.pyqtSlot(float, str)
+    def progress_slot(self, fraction, message):
+        self.progress(fraction, message)        
     def progress(self, fraction, message):
         self.progressBar.setValue(round(fraction * 100))
-        self.statusBar.showMessage(message, 2000)
+        self.status(message)
+        
+    def status(self, message, time=2000):
+        self.statusBar.showMessage(message, time)
                 
 
     def closeEvent(self, event):
@@ -157,7 +162,7 @@ class TsunamiWindow(qw.QMainWindow):
         self.settings.setValue('geometry', self.saveGeometry())
         # Close the mayavi instances
         mlab.close(all=True)
-        # Close any running linux links
+        # Close any running models
         for tab in [self.tab_nhwave, self.tab_funwave]:
             tab.model.linux_link.terminate()     
                 

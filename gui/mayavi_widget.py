@@ -129,7 +129,7 @@ class MayaviQWidget(QtGui.QWidget):
                                         colormap=colormap,
                                         figure=self.figure) 
             
-            # Add a countour to mark the coastline
+            # Add a contour to mark the coastline
             self.coastline = mlab.contour_surf(self.xs,
                                                self.ys,
                                                self.bathymetry_data,
@@ -155,7 +155,7 @@ class MayaviQWidget(QtGui.QWidget):
         self.hide_plot(self.coastline)        
 
         
-    def show_wave_height(self, heights, colormap='jet'):       
+    def show_wave_height(self, heights, colormap='jet'):               
         self.wave_height = self.show_plot(self.wave_height, heights, colormap, 'Wave amplitude (m)')
         
         if self.wave_height is not None:
@@ -171,27 +171,24 @@ class MayaviQWidget(QtGui.QWidget):
         self.hide_plot(self.wave_max)
         
         
-    def show_landslide(self, depth):
-        if depth is None:
+    def show_landslide(self, zs):
+        # TODO Merge with show_plot
+        if zs is None:
             if self.landslide is not None:
                 self.hide_plot(self.landslide)
             return            
         
-        zs = -depth.T        
-        mask = zs < self.bathymetry_data + 0.1
-        
         if self.landslide is None:
             self.landslide = mlab.surf(self.xs,
                                        self.ys,
-                                       zs,
+                                       zs.T,
                                        warp_scale=self.vertical_exaggeration,
                                        colormap='Reds',
                                        figure=self.figure,
-                                       opacity=0.7,
-                                       mask=mask)
+                                       opacity=0.7)
             
         elif self.landslide.visible:
-            self.landslide.mlab_source.reset(scalars=zs, mask=mask)            
+            self.landslide.mlab_source.scalars = zs.T          
         else:
             self.landslide.visible = True
             
@@ -203,7 +200,7 @@ class MayaviQWidget(QtGui.QWidget):
     def show_plot(self, plot, zs, colormap, label):  
         if zs is None:
             if plot is not None:
-                self.hide_plot(plot)
+                self.hide_plot(plot)         
             
         # If the wave hasn't already been drawn, do so
         elif plot is None:
@@ -239,8 +236,8 @@ class MayaviQWidget(QtGui.QWidget):
             self.cbs[plot].visible = True
             
         return plot
-        
-        
+    
+
     def hide_plot(self, plot):
         if plot is not None:
             plot.visible = False
@@ -260,8 +257,8 @@ class MayaviQWidget(QtGui.QWidget):
         # (red, green, blue, alpha) coded with integers going from 0 to 255.
                         
         data = plot.mlab_source.scalars
-        maxd = np.max(data)
-        mind = np.min(data)
+        maxd = np.nanmax(data)
+        mind = np.nanmin(data)
         #Data range
         dran = maxd - mind
         

@@ -14,8 +14,8 @@ from glob import glob
 
 
 from mayavi_widget import MayaviQWidget, mlab
-from common import WidgetMethods, build_wms_url, DoubleSlider
-from tsunamis.utilities.io import read_configuration_file
+from common import WidgetMethods, build_wms_url, DoubleSlider, InputGroup
+from tsunamis.utilities.io import read_configuration_file, read_grid
 
 
 
@@ -79,15 +79,15 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         steppersplit.addWidget(self.timestepper)
         steppersplit.addWidget(plot_buttons)        
         plot_controls.setLayout(steppersplit)
-        self.plot_options = self.create_input_group('Plot options',
-                                                  main_layout=False)
-        self.display_bathymetry = self.add_input('Bathymetry', value=True,
-                                                  function=self.display_bathymetry_changed)
-        self.display_wave_height = self.add_input('Wave height', value=True,
+        self.plot_options = InputGroup(self, 'Plot options', main_layout=False)
+        self.display_bathymetry = self.plot_options.add_input('Bathymetry',
+                                                              value=True,
+                                                              function=self.display_bathymetry_changed)
+        self.display_wave_height = self.plot_options.add_input('Wave height', value=True,
                                                   function=self.display_wave_height_changed)
-        self.display_wave_max = self.add_input('Maximum wave height', value=False,
+        self.display_wave_max = self.plot_options.add_input('Maximum wave height', value=False,
                                                function=self.display_wave_max_changed)
-        self.display_wave_vectors = self.add_input('Wave vectors', value=False,
+        self.display_wave_vectors = self.plot_options.add_input('Wave vectors', value=False,
                                                    function=self.display_wave_vectors_changed)
         
         
@@ -114,26 +114,25 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         stepper_buttons.addWidget(next_step)
         stepper_buttons.addWidget(self.play_pause_button)
         
-        display_options = self.create_input_group('Display options',
-                                               main_layout=False)        
-        display_options.layout().addLayout(stepper_buttons)        
-        self.vertical_exaggeration = self.add_input('Vertical exaggeration', value=10,
-                                                    function=self.plot.set_vertical_exaggeration)        
+        display_options = InputGroup(self, 'Display options', main_layout=False)        
+        display_options.addLayout(stepper_buttons)        
+        self.vertical_exaggeration = display_options.add_input('Vertical exaggeration', value=10,
+                                                               function=self.plot.set_vertical_exaggeration)        
         self.plot.set_vertical_exaggeration(10)
         
         
-        self.rhs_buttons = self.create_input_group(self.model.model + ' controls',
-                                                   main_layout=False)
-        self.run_button = self.add_button('Run ' + self.model.model, self.run_model_clicked)  
-        self.console_toggle = self.add_button('Show console output', self.toggle_console)
+        self.rhs_buttons = InputGroup(self,
+                                      self.model.model + ' controls',
+                                      main_layout=False)
+        self.run_button = self.rhs_buttons.add_button('Run ' + self.model.model, self.run_model_clicked)  
+        self.console_toggle = self.rhs_buttons.add_button('Show console output', self.toggle_console)
         self.console.hide() 
-
 
         
         plot_control_layout = qw.QHBoxLayout()
-        plot_control_layout.addWidget(self.plot_options)
-        plot_control_layout.addWidget(display_options)
-        plot_control_layout.addWidget(self.rhs_buttons)
+        plot_control_layout.addWidget(self.plot_options.widget)
+        plot_control_layout.addWidget(display_options.widget)
+        plot_control_layout.addWidget(self.rhs_buttons.widget)
         plot_buttons.setLayout(plot_control_layout)        
         
                 
@@ -144,66 +143,66 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         #=====================================================================
         
         #TODO set tooltips using .setToolTip
-        self.create_input_group('General')        
+        g = InputGroup(self, 'General')        
         
-        self.add_button('Write model inputs', self.write_model_inputs)
+        g.add_button('Write model inputs', self.write_model_inputs)
         
         desktop = os.path.join(os.environ['USERPROFILE'],
                                'Desktop',
                                self.model.model)
-        self.model_folder = self.add_input('Model folder',
-                                           value=desktop,
-                                           function=self.load_directory,
-                                           dialogue_label=f'Select {self.model.model} folder')
+        self.model_folder = g.add_input('Model folder',
+                                        value=desktop,
+                                        function=self.load_directory,
+                                        dialogue_label=f'Select {self.model.model} folder')
 
-        self.results_folder = self.add_input('Results folder',
-                                             value='results',
-                                             function=self.load_results,
-                                             dialogue_label='Select results folder')
+        self.results_folder = g.add_input('Results folder',
+                                          value='results',
+                                          function=self.load_results,
+                                          dialogue_label='Select results folder')
         
-        self.add_button('Load configuration', self.set_configuration_file)
-        self.add_input('Processor number X', 'PX', 2)
-        self.add_input('Processor number Y', 'PY', 2)
+        g.add_button('Load configuration', self.set_configuration_file)
+        g.add_input('Processor number X', 'PX', 2)
+        g.add_input('Processor number Y', 'PY', 2)
         
-        self.create_input_group('Run setup')
-        self.add_input('Model run title', 'TITLE', 'test')
-        step_widget = self.add_input('Simulation steps', 'SIM_STEPS', 1000)   
+        g = InputGroup(self, 'Run setup')
+        g.add_input('Model run title', 'TITLE', 'test')
+        step_widget = g.add_input('Simulation steps', 'SIM_STEPS', 1000)   
         step_widget.setSingleStep(100)
         #TODO make this accept different units of time, not just seconds
-        self.add_input('Total time', 'TOTAL_TIME', 300.0, function=self.total_time_changed)
+        g.add_input('Total time', 'TOTAL_TIME', 300.0, function=self.total_time_changed)
         self.timestepper.setMaximum(300)
-        self.add_input('Output time start', 'PLOT_START', 0.0, function=self.plot_start_changed)
+        g.add_input('Output time start', 'PLOT_START', 0.0, function=self.plot_start_changed)
         self.timestepper.setMinimum(0.0)
-        output_interval = self.add_input('Output interval', 'PLOT_INTV', 10.0,
-                                         function=self.plot_interval_changed)
+        output_interval = g.add_input('Output interval', 'PLOT_INTV', 10.0,
+                                      function=self.plot_interval_changed)
         output_interval.setMinimum(1E-5)
         self.timestepper.setInterval(10.0)
         self.recalculate_timesteps()
         
-        self.add_input('Screen output interval', 'SCREEN_INTV', 10.0)
-        self.add_input('Initial timestep size', 'DT_INI', 2.0)
-        self.add_input('Minimium timestep', 'DT_MIN', 0.01)
-        self.add_input('Maximum timestep', 'DT_MAX', 10.0)
+        g.add_input('Screen output interval', 'SCREEN_INTV', 10.0)
+        g.add_input('Initial timestep size', 'DT_INI', 2.0)
+        g.add_input('Minimium timestep', 'DT_MIN', 0.01)
+        g.add_input('Maximum timestep', 'DT_MAX', 10.0)
         # TODO implement hotstarting
-        hotstart = self.add_input('Hotstart', 'HOTSTART', False)
-        hotstart.setEnabled = False
+        g.add_input('Hotstart', 'HOTSTART', False, enabled=False)
         
-        self.bathymetry_group = self.create_input_group('Bathymetry', self.make_grid_coords)
-        self.add_button('Load bathymetry from grid', self.load_bathymetry)
-        self.add_button('Load bathymetry from map', self.download_bathymetry)
+        g = InputGroup(self, 'Bathymetry', self.make_grid_coords)
+        self.bathymetry_group = g
+        g.add_button('Load bathymetry from grid', self.load_bathymetry)
+        g.add_button('Load bathymetry from map', self.download_bathymetry, enabled=False)
         
-        self.add_input('Number of cells in the X direction', 'Mglob', 400)
-        self.add_input('Number of cells in the Y direction', 'Nglob', 300)        
+        g.add_input('Number of cells in the X direction', 'Mglob', 400, editable=False)
+        g.add_input('Number of cells in the Y direction', 'Nglob', 300, editable=False)        
 
         #TODO Interpolation of bathymetry 
-        self.add_input('Grid size X', 'DX', 5.0)
-        self.add_input('Grid size Y', 'DY', 5.0)
+        g.add_input('Grid size X', 'DX', 5.0)
+        g.add_input('Grid size Y', 'DY', 5.0)
 
-        self.add_input('Bathymetry grid type', 'DEPTH_TYPE',
+        g.add_input('Bathymetry grid type', 'DEPTH_TYPE',
                        {'Cell centred':'CELL_CENTER',
                         'Cell vertex aligned':'CELL_GRID'})        
-        self.add_input('Analytical bathymetry', 'ANA_BATHY', False)
-        self.add_input('DepConst', 'DepConst', 0.3)        
+        g.add_input('Analytical bathymetry', 'ANA_BATHY', False)
+        g.add_input('DepConst', 'DepConst', 0.3)        
         
         self.x0 = 0
         self.y0 = 0
@@ -233,7 +232,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
     def display_wave_height_changed(self, value=None):
         if value is None: value = self.display_wave_height.value()
         if value:
-            self.plot.show_wave_height(self.results['eta'][self.timestep])
+            self.plot.show_wave_height(self.mask_above_ground(self.results['eta'][self.timestep]))
         else:
             self.plot.hide_wave_height()
         
@@ -252,6 +251,16 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         else:
             self.plot.hide_wave_vectors()
             
+    def mask_above_ground(self, zs):   
+        # TODO make the masking happen when the results are loaded
+        if zs is None:
+            return None
+            
+        zs = zs.copy()         
+        extra = self.pv(self.mask_extra_depth_parameter)
+        mask = zs <= (self.zs + extra)
+        zs[mask] = np.nan
+        return zs
         
     def recalculate_timesteps(self):
         self.timesteps = np.arange(self.pv('PLOT_START'),
@@ -406,7 +415,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         elif extension == 'asc':
             self.load_arcascii(path)
         elif extension == 'txt':
-            self.zs = -np.loadtxt(path)            
+            self.zs = -read_grid(path)            
             # Set cell size according to file if appropriate
             # dz = self.zs.max() - self.zs.min()
             # maxdim = max(self.pv('DX'), self.pv('DY'))
@@ -555,6 +564,9 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # Output them
         self.model.write_config()
         
+        self.parent.status(self.model.model + ' inputs written to '
+                           + self.model.output_directory)
+        
         
     def set_model_inputs(self):
         # Set parameters
@@ -619,7 +631,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
                 self.parent.reader.add_task(record, timestep, path)
         
         self.parent.reader.start()
-        
+
         # Refresh any plots that are showing
         self.refresh_plots()
         

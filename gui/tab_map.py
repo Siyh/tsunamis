@@ -5,7 +5,7 @@ from PyQt5 import QtWidgets as qw
 import cartopy.crs as ccrs
 import numpy as np
 
-from common import WidgetMethods#, build_wms_url
+from common import WidgetMethods, InputGroup
 from bokeh_widget import BokehMapQWidget
 from bokeh.models import ColumnDataSource#, Line
 
@@ -54,13 +54,13 @@ class TabMap(qw.QWidget, WidgetMethods):
         
     
     def add_map_area(self, model, colour):
-        self.create_input_group(model + ' area',
-                                lambda: self.update_map_box(model))
-        self.add_input('EPSG code', model + '_epsg', 4326)
-        self.add_input('X min', model + '_xmin', -10.0)
-        self.add_input('X max', model + '_xmax', 10.0)
-        self.add_input('Y min', model + '_ymin', -10.0)
-        self.add_input('Y max', model + '_ymax', 10.0)
+        g = InputGroup(self, model + ' area',
+                       lambda: self.update_map_box(model))
+        g.add_input('EPSG code', model + '_epsg', 4326)
+        g.add_input('X min', model + '_xmin', -10.0)
+        g.add_input('X max', model + '_xmax', 10.0)
+        g.add_input('Y min', model + '_ymin', -10.0)
+        g.add_input('Y max', model + '_ymax', 10.0)
         
         new_box = self.box_coordinates(model)
         for k, v in new_box.items():

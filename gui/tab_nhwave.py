@@ -7,7 +7,8 @@ import os
 
 from tab_model_base import TabModelBase
 from tsunamis.models.nhwave import config as nhwave_config
-from common import sigfigs
+from common import sigfigs, InputGroup
+from tsunamis.utilities.io import read_grid
 
 
 class TabNHWAVE(TabModelBase):
@@ -20,6 +21,8 @@ class TabNHWAVE(TabModelBase):
         # Add vertical velicoty to the list of outputs to load
         #DEBUG removed to speed up loading during testing
         #self.result_types['Ws'] = 'wave vector w component'
+        
+        self.mask_extra_depth_parameter = 'MinDep'
 
         
         super().__init__(parent)       
@@ -30,253 +33,223 @@ class TabNHWAVE(TabModelBase):
         # Add nhwave specific inputs
         #=====================================================================
         
-        self.add_input('Vertical layers', 'Kglob', 3)        
-        self.add_input('Vertical grid distribution', 'IVGRD',
-                       ['uniform', 'exponential']) 
-        self.add_input('GRD_R', 'GRD_R', 1.1)
+        self.bathymetry_group.add_input('Vertical layers', 'Kglob', 3)        
+        self.bathymetry_group.add_input('Vertical grid distribution', 'IVGRD',
+                                        ['uniform', 'exponential']) 
+        self.bathymetry_group.add_input('GRD_R', 'GRD_R', 1.1)
         
-        self.create_input_group('Landslide Creator', self.recalculate_landslide)
+        
+        g = InputGroup(self, 'Landslide Creator', self.recalculate_landslide)
         
         #TODO use https://www.tutorialspoint.com/pyqt/pyqt_qstackedwidget.htm
         # to make options option specific
         
-        # Commented options are for the rigid landslide
-        # self.add_input('Slide type', 'SlideType',
-        #                {'deformable':'DEFORMABLE',
-        #                 'rigid (nhwave 2.0)':'RIGID',
-        #                 'rigid (nhwave 3.0)':'RIGID_3D'})
-        self.add_input('Thickness', 'SlideT', 30.0)
-        self.add_input('Length', 'SlideL', 200.0)
-        self.add_input('Width', 'SlideW', 500.0)
-        self.add_input('Direction', 'SlideAngle', 270.0)
-        self.add_input('Slope angle', 'SlopeAngle', 10.0)
+        g.add_input('Thickness', 'SlideT', 30.0)
+        g.add_input('Length', 'SlideL', 200.0)
+        g.add_input('Width', 'SlideW', 500.0)
+        g.add_input('Direction', 'SlideAngle', 270.0)
+        g.add_input('Slope angle', 'SlopeAngle', 10.0)
         # TODO add option to make this relative
-        self.add_input('X coordinate', 'SlideX0', 1000.0)
-        self.add_input('Y coordinate', 'SlideY0', 1000.0)
-        # self.add_input('Max speed?', 'SlideUt', 10.0)
-        # self.add_input('Acceleration', 'SlideA0', 0.37)
-        # self.add_input('Density', 'SlideDens', 2100.0)
-        # self.add_input('Viscosity', 'SlideVisc', 0.00001)
-        # self.add_input('Lambda', 'SlideLambda', 0.5)
-        # self.add_input('Inital speed', 'SlideIniU', 0.0)
-        # self.add_input('Cf_ul', 'Cf_ul', 0.02)
-        # self.add_input('PhiInt', 'PhiInt', 41.0)
-        # self.add_input('PhiBed', 'PhiBed', 23.0)
+        g.add_input('X coordinate', 'SlideX0', 1000.0)
+        g.add_input('Y coordinate', 'SlideY0', 1000.0)
 
         self.landslide_volume = qw.QLabel()
-        self.add_input('Landslide Volume', widget=self.landslide_volume, function=False)        
-        self.add_button('Output landslide thickness', self.output_landslide)
+        g.add_input('Landslide Volume', widget=self.landslide_volume, function=False)        
+        g.add_button('Output landslide thickness', self.output_landslide)
         
         
-        self.create_input_group('Landslides')
-        self.add_input('Slide thickness',
-                       'SLIDE_FILE',
-                       'SlideThickness.txt',
-                       function=self.load_slide_thickness,
-                       dialogue_label='Select initial slide thickness',
-                       formats='txt')
+        g = InputGroup(self, 'Landslides')
+        g.add_input('Slide thickness',
+                    'SLIDE_FILE',
+                    'SlideThickness.txt',
+                    function=self.load_slide_thickness,
+                    dialogue_label='Select initial slide thickness',
+                    formats='txt')
         
-        self.add_input('Rheology option', 'RHEO_OPT', {'Viscous':'VISCOUS',
-                                                       'Granular':'GRANULAR'})        
-        self.add_input('momentum distribution coefficient', 'SLIDE_GAMMA', 1.0)
-        self.add_input('use hydrostatic model?', 'NON_HYDRO_SLD', True)
-        self.add_input('dispersion correction in non-hydrostatic model', 'DISP_CORR_SLD', True)
-        self.add_input('reduced gravitation in non-hydrostatic model', 'REDU_GRAV_SLD', True)
-        self.add_input('non-hydrostatic from upper layer', 'NON_HYDRO_UP', True)
-        self.add_input('minimum slide thickness', 'SLIDE_MINTHICK', 1E-4)
-        self.add_input('initial velocity of slide in x', 'SLIDE_INIU', 0.0)
-        self.add_input('initial velocity of slide in y', 'SLIDE_INIV', 0.0)
-        self.add_input('initial velocity of slide in z', 'SLIDE_INIW', 0.0)
-        self.add_input('viscous slide density (kg/m\u00b3)', 'SLIDE_DENSITY', 1760.0)
-        self.add_input('kinematic viscosity of viscous slide (m\u00b2/s)', 'SLIDE_VISCOSITY', 0.5)
-        self.add_input('pure grain density', 'GRAIN_DENSITY', 2600.0)
-        self.add_input('sediment concentration', 'SLIDE_CONC', 0.475)
-        self.add_input('internal friction angle A', 'PhiInt_A', 41.0)
-        self.add_input('bed friction angle A', 'PhiBed_A', 23.0)
-        self.add_input('internal friction angle F', 'PhiInt_F', 32.0)
-        self.add_input('bed friction angle F', 'PhiBed_F', 18.0)
-        self.add_input('% of non-hydrostatic pressure', 'SLIDE_LAMBDA', 1.0)
-
-    
+        g.add_input('Rheology option', 'RHEO_OPT', {'Viscous':'VISCOUS',
+                                                    'Granular':'GRANULAR'})        
+        g.add_input('momentum distribution coefficient', 'SLIDE_GAMMA', 1.0)
+        g.add_input('use hydrostatic model?', 'NON_HYDRO_SLD', True)
+        g.add_input('dispersion correction in non-hydrostatic model', 'DISP_CORR_SLD', True)
+        g.add_input('reduced gravitation in non-hydrostatic model', 'REDU_GRAV_SLD', True)
+        g.add_input('non-hydrostatic from upper layer', 'NON_HYDRO_UP', True)
+        g.add_input('minimum slide thickness', 'SLIDE_MINTHICK', 1E-4)
+        g.add_input('initial velocity of slide in x', 'SLIDE_INIU', 0.0)
+        g.add_input('initial velocity of slide in y', 'SLIDE_INIV', 0.0)
+        g.add_input('initial velocity of slide in z', 'SLIDE_INIW', 0.0)
+        g.add_input('viscous slide density (kg/m\u00b3)', 'SLIDE_DENSITY', 1760.0)
+        g.add_input('kinematic viscosity of viscous slide (m\u00b2/s)', 'SLIDE_VISCOSITY', 0.5)
+        g.add_input('pure grain density', 'GRAIN_DENSITY', 2600.0)
+        g.add_input('sediment concentration', 'SLIDE_CONC', 0.475)
+        g.add_input('internal friction angle A', 'PhiInt_A', 41.0)
+        g.add_input('bed friction angle A', 'PhiBed_A', 23.0)
+        g.add_input('internal friction angle F', 'PhiInt_F', 32.0)
+        g.add_input('bed friction angle F', 'PhiBed_F', 18.0)
+        g.add_input('% of non-hydrostatic pressure', 'SLIDE_LAMBDA', 1.0)    
         
-        self.start_dropdown('Boundary')
-        self.add_input('Period boundary condition X', 'PERIODIC_X', False)
-        self.add_input('Period boundary condition Y', 'PERIODIC_Y', False)        
-        self.add_input('External forcing', 'EXTERNAL_FORCING', False)
-        self.add_input('Pgrad0', 'Pgrad0', 9.81e-4)        
+        g = InputGroup(self, 'Boundary', dropdown=True)
+        g.add_input('Period boundary condition X', 'PERIODIC_X', False)
+        g.add_input('Period boundary condition Y', 'PERIODIC_Y', False)        
+        g.add_input('External forcing', 'EXTERNAL_FORCING', False)
+        g.add_input('Pgrad0', 'Pgrad0', 9.81e-4)        
         for d in ['X', 'Y', 'Z']:
             for v in ['0', 'n']:
-                self.add_input('Boundary condition ' + d + v, 'BC_' + d + v,
-                               ['free-slip',
-                                'no-slip',
-                                'influx',
-                                'outflux (specified eta)',
-                                'bottom friction',
-                                'radiation bc'])  
-        self.finish_dropdown()
+                g.add_input('Boundary condition ' + d + v, 'BC_' + d + v,
+                            ['free-slip',
+                             'no-slip',
+                             'influx',
+                             'outflux (specified eta)',
+                             'bottom friction',
+                             'radiation bc'])  
                 
-        self.start_dropdown('Sponge boundary')
-        self.add_input('Sponge on', 'SPONGE_ON', False)
+        g = InputGroup(self, 'Sponge boundary', dropdown=True)
+        g.add_input('Sponge on', 'SPONGE_ON', False, group_enabler=True)
         for d in ['North', 'East', 'South', 'West']:
-            self.add_input(f'Sponge {d.lower()} width',
-                           f'Sponge_{d}_Width', 0.0)           
-        self.add_input('Maximum iterations', 'ITMAX', 1000)
-        self.add_input('Tolerance', 'TOL', 1E-8)
-        self.finish_dropdown()        
+            g.add_input(f'Sponge {d.lower()} width',
+                        f'Sponge_{d}_Width', 0.0)           
+        g.add_input('Maximum iterations', 'ITMAX', 1000)
+        g.add_input('Tolerance', 'TOL', 1E-8)
         
-        self.start_dropdown('Wind')
-        self.add_input('Wind speed', 'Iws', ['constant', 'variable'])
-        self.add_input('WindU', 'WindU', 0.0)
-        self.add_input('WindV', 'WindV', 0.0)
-        self.finish_dropdown()
+        g = InputGroup(self, 'Wind', dropdown=True)
+        g.add_input('Wind speed', 'Iws', ['constant', 'variable'])
+        g.add_input('WindU', 'WindU', 0.0)
+        g.add_input('WindV', 'WindV', 0.0)
         
-        self.start_dropdown('Rheology')
-        self.add_input('Use rheology', 'RHEOLOGY_ON', False,
-                       function=self.rheology_enabled_changed)        
-        self.yield_stress = self.add_input('Yield stress', 'Yield_Stress', 10.0)
-        self.plastic_viscosity = self.add_input('Plastic viscosity', 'Plastic_Visc', 0.0) 
-        self.rheology_enabled_changed(False)
-        self.finish_dropdown()
+        g = InputGroup(self, 'Rheology', dropdown=True)
+        g.add_input('Use rheology', 'RHEOLOGY_ON', False, group_enabler=True)        
+        g.add_input('Yield stress', 'Yield_Stress', 10.0)
+        g.add_input('Plastic viscosity', 'Plastic_Visc', 0.0) 
         
-        self.start_dropdown('To sort')
-        self.add_input('INITIAL_EUVW', 'INITIAL_EUVW', False)
-        self.add_input('INITIAL_SALI', 'INITIAL_SALI', False)
-        self.add_input('Latitude', 'slat', 54.0)
-        self.add_input('Barotropic', 'BAROTROPIC', True)
-        self.add_input('Non-hydrostatic', 'NON_HYDRO', True)
-        self.add_input('Cournat number', 'CFL', 0.5)
-        self.add_input('Fourde cap', 'FROUDE_CAP', 0.5)
-        self.add_input('Time to ramp up simulation', 'TRAMP', 0.0)
+        g = InputGroup(self, 'To sort', dropdown=True)
+        g.add_input('INITIAL_EUVW', 'INITIAL_EUVW', False)
+        g.add_input('INITIAL_SALI', 'INITIAL_SALI', False)
+        g.add_input('Latitude', 'slat', 54.0)
+        g.add_input('Barotropic', 'BAROTROPIC', True)
+        g.add_input('Non-hydrostatic', 'NON_HYDRO', True)
+        g.add_input('Cournat number', 'CFL', 0.5)
+        g.add_input('Fourde cap', 'FROUDE_CAP', 0.5)
+        g.add_input('Time to ramp up simulation', 'TRAMP', 0.0)
         for o in ['HIGH_ORDER', 'TIME_ORDER']:            
-            self.add_input(o, o, {'first':'FIRST', 'second':'SECOND'}) 
-        self.add_input('Convection', 'CONVECTION',
+            g.add_input(o, o, {'first':'FIRST', 'second':'SECOND'}) 
+        g.add_input('Convection', 'CONVECTION',
                        {'TVD':'TVD', 'HLPA':'HLPA'},
                        default='HLPA')        
-        self.add_input('Minimum depth for wetting-drying', 'MinDep', 0.1)
-        self.add_input('HLLC', 'HLLC', False)        
-        self.add_input('Bottom roughness method', 'Ibot',
+        g.add_input('Minimum depth for wetting-drying', 'MinDep', 0.1)
+        g.add_input('HLLC', 'HLLC', False)        
+        g.add_input('Bottom roughness method', 'Ibot',
                        {'use drag coefficient':1,
                         'use bottom roughness height':2})
-        self.add_input('Drag coefficient', 'Cd0', 0.006)
-        self.add_input('Bottom roughtness height', 'Zob', 0.0001)
-        self.add_input('Dfric_Min', 'Dfric_Min', 0.0)
-        self.add_input('Minimum depth for wetting-drying', 'MinDep ', 0.01)
-        self.finish_dropdown()        
+        g.add_input('Drag coefficient', 'Cd0', 0.006)
+        g.add_input('Bottom roughtness height', 'Zob', 0.0001)
+        g.add_input('Dfric_Min', 'Dfric_Min', 0.0)
         
-        self.start_dropdown('Flow properties')
-        self.add_input('Viscous flow', 'VISCOUS_FLOW', False)
-        self.add_input('IVTURB', 'IVTURB', 10)
-        self.add_input('IHTURB', 'IHTURB', 10)
-        self.add_input('PRODTYPE', 'PRODTYPE', 3)
-        self.add_input('Viscosity', 'VISCOSITY', 1E-6)
-        self.add_input('Schmidt', 'Schmidt', 1.0)
-        self.add_input('Chs', 'Chs', 0.001)
-        self.add_input('Cvs', 'Cvs', 0.001)
-        self.add_input('RNG', 'RNG', True)        
-        self.add_input('Viscous number', 'VISCOUS_NUMBER', 0.1666667)
-        self.finish_dropdown()  
+        g = InputGroup(self, 'Flow properties', dropdown=True)
+        g.add_input('Viscous flow', 'VISCOUS_FLOW', False)
+        g.add_input('IVTURB', 'IVTURB', 10)
+        g.add_input('IHTURB', 'IHTURB', 10)
+        g.add_input('PRODTYPE', 'PRODTYPE', 3)
+        g.add_input('Viscosity', 'VISCOSITY', 1E-6)
+        g.add_input('Schmidt', 'Schmidt', 1.0)
+        g.add_input('Chs', 'Chs', 0.001)
+        g.add_input('Cvs', 'Cvs', 0.001)
+        g.add_input('RNG', 'RNG', True)        
+        g.add_input('Viscous number', 'VISCOUS_NUMBER', 0.1666667)
         
-        self.start_dropdown('Solver')
-        self.add_input('Poisson solver', 'ISOLVER',
-                       ['Modified Incomplete Cholesky CG',
-                        'Incomplete Cholesky GMRES',
-                        'Successive Overrelaxation (SOR) GMRES'],
-                       default=1)
-        self.add_input('Maximum iterations', 'ITMAX', 1000)
-        self.add_input('Tolerance', 'TOL', 1E-8) 
-        self.finish_dropdown()  
+        g = InputGroup(self, 'Solver', dropdown=True)
+        g.add_input('Poisson solver', 'ISOLVER',
+                    ['Modified Incomplete Cholesky CG',
+                     'Incomplete Cholesky GMRES',
+                     'Successive Overrelaxation (SOR) GMRES'],
+                    default=1)
+        g.add_input('Maximum iterations', 'ITMAX', 1000)
+        g.add_input('Tolerance', 'TOL', 1E-8)        
         
-        
-        self.start_dropdown('Wavemaker')
-        self.add_input('Wave type', 'WAVEMAKER', {'None':'NONE'})
-        self.add_input('AMP', 'AMP', 0.0144)
-        self.add_input('PER', 'PER', 10.5)
-        self.add_input('DEP', 'DEP', 0.32)
-        self.add_input('incident wave angle', 'THETA', 0.0)
-        self.add_input('CUR', 'CUR', 0.0)
-        self.add_input('sd_return', 'sd_return', 0.75)
+        g = InputGroup(self, 'Wavemaker', dropdown=True)
+        g.add_input('Wave type', 'WAVEMAKER', {'None':'NONE'})
+        g.add_input('AMP', 'AMP', 0.0144)
+        g.add_input('PER', 'PER', 10.5)
+        g.add_input('DEP', 'DEP', 0.32)
+        g.add_input('incident wave angle', 'THETA', 0.0)
+        g.add_input('CUR', 'CUR', 0.0)
+        g.add_input('sd_return', 'sd_return', 0.75)
         
         #TODO implement sediment, wavemaker, vegetation     
         #TODO implement probes, hotstart parameters, coupling
-        self.finish_dropdown()
         
-        self.start_dropdown('Wave average control')
-        self.add_input('Enabled', 'WAVE_AVERAGE_ON ', False)
-        self.add_input('Start', 'WAVE_AVERAGE_START', 200.0)
-        self.add_input('End', 'WAVE_AVERAGE_END', 1800.0)
-        self.add_input('ID', 'WaveheightID', 2)
-        self.finish_dropdown()  
+        g = InputGroup(self, 'Wave average control', dropdown=True)
+        g.add_input('Enabled', 'WAVE_AVERAGE_ON ', False, group_enabler=True)
+        g.add_input('Start', 'WAVE_AVERAGE_START', 200.0)
+        g.add_input('End', 'WAVE_AVERAGE_END', 1800.0)
+        g.add_input('ID', 'WaveheightID', 2)
         
-        self.start_dropdown('Sediment')
-        self.add_input('Sediment option', 'Sed_Type', {'Cohesive':'COHESIVE',
+        g = InputGroup(self, 'Sediment', dropdown=True)
+        g.add_input('Sediment option', 'Sed_Type', {'Cohesive':'COHESIVE',
                                                        'Non-cohesive':'NONCOHESIVE'})
-        self.add_input('BED_LOAD', 'BED_LOAD', False)
-        self.add_input('COUPLE_FS', 'COUPLE_FS', False)
-        self.add_input('Af', 'Af', 0.0)
-        self.add_input('D50', 'D50', 1.2e-5)
-        self.add_input('ntyws', 'ntyws', 1)
-        self.add_input('Sedi_Ws', 'Sedi_Ws', 0.00007)
-        self.add_input('Shields_c', 'Shields_c', 0.05)
-        self.add_input('Tau_ce', 'Tau_ce', 0.15)
-        self.add_input('Tau_cd', 'Tau_cd', 0.07)
-        self.add_input('Erate', 'Erate', 4.0e-8)
-        self.add_input('Mud_Visc', 'Mud_Visc', 1.e-6)
-        self.add_input('Tim_Sedi', 'Tim_Sedi', 0.0)
-        self.add_input('MorDt', 'MorDt', 0.0)
-        self.add_input('BED_CHANGE', 'BED_CHANGE', True)
-        self.finish_dropdown()  
+        g.add_input('BED_LOAD', 'BED_LOAD', False)
+        g.add_input('COUPLE_FS', 'COUPLE_FS', False)
+        g.add_input('Af', 'Af', 0.0)
+        g.add_input('D50', 'D50', 1.2e-5)
+        g.add_input('ntyws', 'ntyws', 1)
+        g.add_input('Sedi_Ws', 'Sedi_Ws', 0.00007)
+        g.add_input('Shields_c', 'Shields_c', 0.05)
+        g.add_input('Tau_ce', 'Tau_ce', 0.15)
+        g.add_input('Tau_cd', 'Tau_cd', 0.07)
+        g.add_input('Erate', 'Erate', 4.0e-8)
+        g.add_input('Mud_Visc', 'Mud_Visc', 1.e-6)
+        g.add_input('Tim_Sedi', 'Tim_Sedi', 0.0)
+        g.add_input('MorDt', 'MorDt', 0.0)
+        g.add_input('BED_CHANGE', 'BED_CHANGE', True)
         
-        self.start_dropdown('Vegetation')
-        self.add_input('Veg_Type', 'Veg_Type', ['RIGID'])
-        self.add_input('Veg_X0', 'Veg_X0 ', 2.85)
-        self.add_input('Veg_Xn', 'Veg_Xn ', 5.3)
-        self.add_input('Veg_Y0', 'Veg_Y0 ', 0.0)
-        self.add_input('Veg_Yn', 'Veg_Yn ', 0.1)
-        self.add_input('VegH', 'VegH ', 0.135)
-        self.add_input('VegDens', 'VegDens ', 1250.0)
-        self.add_input('VegVol', 'VegVol ', 0.0)
-        self.add_input('StemD', 'StemD ', 0.0064)
-        self.add_input('VegDrag', 'VegDrag ', 0.8)
-        self.add_input('Cfk', 'Cfk ', 1.0)
-        self.add_input('Cfe', 'Cfe ', 1.33)
-        self.add_input('VegVM', 'VegVM ', 0.0)
-        self.add_input('EI', 'EI ', 8.0e-7)
-        self.finish_dropdown()  
+        g = InputGroup(self, 'Vegetation', dropdown=True)
+        g.add_input('Veg_Type', 'Veg_Type', ['RIGID'])
+        g.add_input('Veg_X0', 'Veg_X0 ', 2.85)
+        g.add_input('Veg_Xn', 'Veg_Xn ', 5.3)
+        g.add_input('Veg_Y0', 'Veg_Y0 ', 0.0)
+        g.add_input('Veg_Yn', 'Veg_Yn ', 0.1)
+        g.add_input('VegH', 'VegH ', 0.135)
+        g.add_input('VegDens', 'VegDens ', 1250.0)
+        g.add_input('VegVol', 'VegVol ', 0.0)
+        g.add_input('StemD', 'StemD ', 0.0064)
+        g.add_input('VegDrag', 'VegDrag ', 0.8)
+        g.add_input('Cfk', 'Cfk ', 1.0)
+        g.add_input('Cfe', 'Cfe ', 1.33)
+        g.add_input('VegVM', 'VegVM ', 0.0)
+        g.add_input('EI', 'EI ', 8.0e-7)
         
         
-        self.create_input_group('Outputs')
-        self.add_input('water depth', 'OUT_H', True,
-                       function=self.display_wave_height.setEnabled)
-        self.add_input('surface elevation', 'OUT_E', True)
-        self.add_input('velocity in x direction', 'OUT_U', True,
-                       function=self.vector_output_changed)
-        self.add_input('velocity in y direction', 'OUT_V', True,
-                       function=self.vector_output_changed)
-        self.add_input('velocity in z direction', 'OUT_W', False,
-                       function=self.vector_output_changed)
-        self.add_input('dynamic pressure', 'OUT_P', False)
-        self.add_input('turbulent kinetic energy', 'OUT_K', False)
-        self.add_input('turbulent dissipation rate', 'OUT_D', False)
-        self.add_input('shear production', 'OUT_S', False)
-        self.add_input('eddy viscosity', 'OUT_C', False)
-        self.add_input('bubble void fraction', 'OUT_B', False)
-        self.add_input('Reynolds stress', 'OUT_A', False)
-        self.add_input('bottom shear stress', 'OUT_T', False)
-        self.add_input('sediment concentration', 'OUT_F', False)
-        self.add_input('bed elevation', 'OUT_G', False)
-        self.add_input('salinity', 'OUT_I', False)
-        self.add_input('varying bathymetry', 'OUT_Z', False)
-        self.add_input('max wave height', 'OUT_M', True,
-                       function=self.display_wave_max.setEnabled)
+        g = InputGroup(self, 'Outputs')
+        g.add_input('water depth', 'OUT_H', True,
+                    function=self.display_wave_height.setEnabled)
+        g.add_input('surface elevation', 'OUT_E', True)
+        g.add_input('velocity in x direction', 'OUT_U', True,
+                    function=self.vector_output_changed)
+        g.add_input('velocity in y direction', 'OUT_V', True,
+                    function=self.vector_output_changed)
+        g.add_input('velocity in z direction', 'OUT_W', False,
+                    function=self.vector_output_changed)
+        g.add_input('dynamic pressure', 'OUT_P', False)
+        g.add_input('turbulent kinetic energy', 'OUT_K', False)
+        g.add_input('turbulent dissipation rate', 'OUT_D', False)
+        g.add_input('shear production', 'OUT_S', False)
+        g.add_input('eddy viscosity', 'OUT_C', False)
+        g.add_input('bubble void fraction', 'OUT_B', False)
+        g.add_input('Reynolds stress', 'OUT_A', False)
+        g.add_input('bottom shear stress', 'OUT_T', False)
+        g.add_input('sediment concentration', 'OUT_F', False)
+        g.add_input('bed elevation', 'OUT_G', False)
+        g.add_input('salinity', 'OUT_I', False)
+        g.add_input('varying bathymetry', 'OUT_Z', False)
+        g.add_input('max wave height', 'OUT_M', True,
+                    function=self.display_wave_max.setEnabled)
         
         # TODO Implement GUI version of probe outputs
-        self.add_input('number of probes', 'NSTAT', 0)
-        self.add_input('probe start time', 'PLOT_INTV_STAT', 10.0)        
+        g.add_input('number of probes', 'NSTAT', 0)
+        g.add_input('probe start time', 'PLOT_INTV_STAT', 10.0)        
         
         
-        self.display_landslide = self.add_input('Landslide', value=True,
-                                                function=self.display_landslide_changed,
-                                                layout=self.plot_options.layout())        
+        self.display_landslide = g.add_input('Landslide', value=True,
+                                             function=self.display_landslide_changed,
+                                             layout=self.plot_options.layout())        
         self.recalculate_landslide()
         
         # Controls for sending the wave to FUNWAVE
@@ -292,10 +265,7 @@ class TabNHWAVE(TabModelBase):
         button.clicked.connect(self.send_wave_to_funwave)
         l.addWidget(button)
         
-        
-    def rheology_enabled_changed(self, value):
-        self.yield_stress.setEnabled(value)
-        self.plastic_viscosity.setEnabled(value)
+    
                 
         
     def send_wave_to_funwave(self):
@@ -334,13 +304,16 @@ class TabNHWAVE(TabModelBase):
     def display_landslide_changed(self, value=None):
         if value is None: value = self.display_landslide.value()
         if value:
-            self.plot.show_landslide(self.results['depth'][self.timestep])
+            depth = self.results['depth'][self.timestep]
+            # None test is necessary cos - won't work on depth
+            if depth is not None:
+                self.plot.show_landslide(self.mask_above_ground(-depth))
         else:
             self.plot.hide_landslide()
             
     
     def load_slide_thickness(self, path):
-        self.results['depth'][self.pv('PLOT_START')] = np.loadtxt(path)
+        self.results['depth'][self.pv('PLOT_START')] = read_grid(path)
         
         
     def recalculate_landslide(self):
@@ -364,11 +337,14 @@ class TabNHWAVE(TabModelBase):
             vol_str = str(sigfigs(vol_est)) + ' m\u00b3'
             
         self.landslide_volume.setText(vol_str)
+        self.refresh_plots()
         
         
     def output_landslide(self):
+        path = os.path.join(self.model_folder.value(), 'SlideThickness.txt')
+        self.status('Landslide thickness exported to ' + path)
         blob = self.generate_landslide_blob()
-        np.savetxt(os.path.join(self.model_folder.value(), 'SlideThickness.txt'), blob)
+        np.savetxt(path, blob)
         
         
     def generate_landslide_blob(self):
