@@ -188,11 +188,14 @@ class InputGroup(qw.QVBoxLayout):
                   editable=True,
                   default=None,
                   function=None,
+                  call=False,
                   layout=None,
                   dialogue_label='',        
                   formats='',
                   group_enabler=False,
-                  enabled=None):  
+                  enabled=None, 
+                  label_tooltip='',
+                  minimum=None):  
         """
         Labels a widget and adds it to the input group. The widget type
         depends on the value used unless a widget is specified. 
@@ -275,9 +278,13 @@ class InputGroup(qw.QVBoxLayout):
             else:
                 raise Exception('Input data type not recognised')
                 
+        label_widget = qw.QLabel(label)
+        if label_tooltip:
+            label_widget.setToolTip(label_tooltip)
+                
         # Put a label next to the widget
-        hbox = qw.QHBoxLayout()
-        hbox.addWidget(qw.QLabel(label))
+        hbox = qw.QHBoxLayout()        
+        hbox.addWidget(label_widget)
         hbox.addWidget(widget)           
                 
         if value is not None:
@@ -291,6 +298,7 @@ class InputGroup(qw.QVBoxLayout):
         # can be looked up when the model inputs are output
         if model_varb_name:
             self.parent_tab.parameters[model_varb_name] = widget 
+            widget.setToolTip(model_varb_name)
         
         # Link it to a function if desired
         if editable:
@@ -337,6 +345,12 @@ class InputGroup(qw.QVBoxLayout):
                 widget.setEnabled(False)
             #Remember the widget so it can be enabled/disabled
             self.widgets.append(widget)
+            
+        if minimum is not None:
+            widget.setMinimum(minimum)
+            
+        if call:
+            function(widget.value())
 
         return widget
     
