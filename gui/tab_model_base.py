@@ -26,7 +26,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
     result_types = {'eta':'wave height result',
                     #DEBUG commented out to speed up loading during testing
                     #'hmax':'max wave height result',
-                     'Us':'wave vector u component',
+                    'Us':'wave vector u component',
                     'Vs':'wave vector v component',
                     #'Ps':'?',
                     }                         
@@ -83,14 +83,15 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.display_bathymetry = self.plot_options.add_input('Bathymetry',
                                                               value=True,
                                                               function=self.display_bathymetry_changed)
-        self.display_wave_height = self.plot_options.add_input('Wave height', value=True,
-                                                  function=self.display_wave_height_changed)
-        self.display_wave_max = self.plot_options.add_input('Maximum wave height', value=False,
-                                               function=self.display_wave_max_changed)
-        self.display_wave_vectors = self.plot_options.add_input('Wave vectors', value=False,
-                                                   function=self.display_wave_vectors_changed)
-        
-        
+        self.display_wave_height = self.plot_options.add_input('Wave height',
+                                                               value=True,
+                                                               function=self.display_wave_height_changed)
+        self.display_wave_max = self.plot_options.add_input('Maximum wave height',
+                                                            value=False,
+                                                            function=self.display_wave_max_changed)
+        self.display_wave_vectors = self.plot_options.add_input('Wave vectors',
+                                                                value=False,
+                                                                function=self.display_wave_vectors_changed)
 
         self.play_pause_button = qw.QPushButton() 
         self.playing = False
@@ -116,10 +117,23 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
         display_options = InputGroup(self, 'Display options', main_layout=False)        
         display_options.addLayout(stepper_buttons)        
-        self.vertical_exaggeration = display_options.add_input('Vertical exaggeration', value=10,
-                                                               function=self.plot.set_vertical_exaggeration)        
-        self.plot.set_vertical_exaggeration(10)
+        self.vertical_exaggeration = display_options.add_input('Vertical exaggeration',
+                                                               value=10.0,
+                                                               minimum=1E-6,
+                                                               function=self.plot.set_vertical_exaggeration,
+                                                               call=True)
         
+        self.vector_exaggeration = display_options.add_input('Vector scale',
+                                                             value=10.0,
+                                                             minimum=1E-6,
+                                                             function=self.plot.set_vector_exaggeration,
+                                                             call=True)
+        
+        self.vector_spacing = display_options.add_input('Vector cell spacing',
+                                                        value=10,
+                                                        minimum=1,
+                                                        function=self.plot.set_vector_spacing,
+                                                        call=True)   
         
         self.rhs_buttons = InputGroup(self,
                                       self.model.model + ' controls',
@@ -173,9 +187,10 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.timestepper.setMaximum(300)
         g.add_input('Output time start', 'PLOT_START', 0.0, function=self.plot_start_changed)
         self.timestepper.setMinimum(0.0)
-        output_interval = g.add_input('Output interval', 'PLOT_INTV', 10.0,
-                                      function=self.plot_interval_changed)
-        output_interval.setMinimum(1E-5)
+        g.add_input('Output interval', 'PLOT_INTV',
+                    value=10.0,
+                    minimum=1E-5,
+                    function=self.plot_interval_changed)
         self.timestepper.setInterval(10.0)
         self.recalculate_timesteps()
         
@@ -223,33 +238,44 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         for f in self.refresh_functions: f()
         
     def display_bathymetry_changed(self, value=None):
-        if value is None: value = self.display_bathymetry.value()
+        if value is None:
+            value = self.display_bathymetry.value()
+            
         if value:
             self.plot.show_bathymetry(self.zs)
         else:
             self.plot.hide_bathymetry()
         
     def display_wave_height_changed(self, value=None):
-        if value is None: value = self.display_wave_height.value()
+        if value is None:
+            value = self.display_wave_height.value()
+            
         if value:
             self.plot.show_wave_height(self.mask_above_ground(self.results['eta'][self.timestep]))
         else:
             self.plot.hide_wave_height()
         
     def display_wave_max_changed(self, value=None):
-        if value is None: value = self.display_wave_max.value()
+        if value is None:
+            value = self.display_wave_max.value()
+            
         if value:
             self.plot.show_wave_max(self.results['hmax'][self.timestep])
         else:
             self.plot.hide_wave_max()
         
     def display_wave_vectors_changed(self, value=None):
-        if value is None: value = self.display_wave_vectors.value()
+        if value is None:
+            value = self.display_wave_vectors.value()
+            
         if value:
             self.plot.show_wave_vectors(self.results['Us'][self.timestep],
-                                        self.results['Vs'][self.timestep])
+                                        self.results['Vs'][self.timestep])            
         else:
             self.plot.hide_wave_vectors()
+            
+        self.vector_exaggeration.setEnabled(value)
+        self.vector_spacing.setEnabled(value)
             
     def mask_above_ground(self, zs):   
         # TODO make the masking happen when the results are loaded
@@ -635,9 +661,12 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         # Refresh any plots that are showing
         self.refresh_plots()
         
-
-
-
+    
+    def estimate_vector_exaggeration(self):
+        e = round(self.pv('DX') / 3)
+        self.plot.set_vector_exaggeration(e)
+        return e
+    
 
         
 if __name__ == '__main__':

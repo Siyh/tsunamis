@@ -41,10 +41,10 @@ class Visualization(HasTraits):
         pass
     
     # the layout of the dialog screated
-    view = View(Item('scene', editor=SceneEditor(scene_class=MayaviScene),
-                     height=250, width=300, show_label=False),
-                     resizable=True # We need this to resize with the parent widget
-                )
+    view = View(Item('scene',
+                     editor=SceneEditor(scene_class=MayaviScene),
+                     show_label=False),
+                resizable=True) # We need this to resize with the parent widget
 
 
 ################################################################################
@@ -245,13 +245,42 @@ class MayaviQWidget(QtGui.QWidget):
                 self.cbs[plot].visible = False
             
             
-    def show_wave_vectors(self): 
-        pass
+    def show_wave_vectors(self, us, vs): 
+        spacing = self.vector_spacing
+        zeros = np.zeros_like(self.xs)[::spacing, ::spacing]
+        
+        if us is None:
+            if self.wave_vectors is not None:
+                self.hide_plot(self.wave_vectors)
+        
+        elif self.wave_vectors is None:
+            self.us = us.T
+            self.vs = vs.T
+            self.wave_vectors = mlab.quiver3d(
+                self.xs[::spacing, ::spacing],
+                self.ys[::spacing, ::spacing],
+                zeros,
+                us.T[::spacing, ::spacing],
+                vs.T[::spacing, ::spacing],
+                zeros,
+                figure=self.figure, 
+                color=(0, 0, 0),
+                scale_factor=self.vector_exaggeration)
             
-    def hide_wave_vectors(self):
-        return
+        elif self.wave_vectors.visible:
+            self.wave_vectors.mlab_source.set(u=us.T[::spacing, ::spacing],
+                                              v=vs.T[::spacing, ::spacing],
+                                              w=zeros) 
+            
+        else:
+            self.wave_vectors.visible = True
+            
+
+            
+    def hide_wave_vectors(self):        
         self.hide_plot(self.wave_vectors)
                 
+        
     def centre_colormap(self, plot):
         # The lut is a 255x4 array, with the columns representing RGBA
         # (red, green, blue, alpha) coded with integers going from 0 to 255.
@@ -294,7 +323,24 @@ class MayaviQWidget(QtGui.QWidget):
                 warp_filter = plot.mlab_source.m_data.children[0]
                 warp_filter.filter.scale_factor = exaggeration
                 
-        
+                
+    def set_vector_exaggeration(self, exaggeration):
+        self.vector_exaggeration = exaggeration
+        if self.wave_vectors is not None:
+            v = self.wave_vectors.mlab_source.m_data.children[0].children[0]
+            v.glyph.glyph.scale_factor = exaggeration
+            
+            
+    def set_vector_spacing(self, spacing):
+        self.vector_spacing = spacing
+        if self.wave_vectors is not None:
+            zeros = np.zeros_like(self.xs)[::spacing, ::spacing]
+            self.wave_vectors.mlab_source.reset(x=self.xs[::spacing, ::spacing],
+                                                y=self.ys[::spacing, ::spacing],
+                                                z=zeros,
+                                                u=self.us[::spacing, ::spacing],
+                                                v=self.vs[::spacing, ::spacing],
+                                                w=zeros) 
         
         
 if __name__ == '__main__':

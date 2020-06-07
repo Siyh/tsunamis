@@ -134,8 +134,9 @@ class TabFUNWAVE(TabModelBase):
         self.refresh_plots()
         
             
-    def vector_output_changed(self):
-        pass
+    def vector_output_changed(self, _):
+        self.display_wave_vectors.setEnabled(self.pv('OUT_U') or
+                                             self.pv('OUT_V'))
 
         
 if __name__ == '__main__':

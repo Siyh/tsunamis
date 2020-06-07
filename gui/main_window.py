@@ -141,6 +141,7 @@ class TsunamiWindow(qw.QMainWindow):
             if folder:
                 folder_full_path = os.path.join(self.config_folder, folder)
                 tab.load_directory(folder_full_path)
+                tab.estimate_vector_exaggeration()
         
         # Read in results
         self.reader.run_threads()

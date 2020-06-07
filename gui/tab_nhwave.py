@@ -295,7 +295,6 @@ class TabNHWAVE(TabModelBase):
         
     
     def vector_output_changed(self, _):
-        # TODO why isn't this working
         self.display_wave_vectors.setEnabled(self.pv('OUT_U') or
                                              self.pv('OUT_V') or
                                              self.pv('OUT_W'))
