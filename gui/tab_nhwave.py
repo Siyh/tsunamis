@@ -254,12 +254,18 @@ class TabNHWAVE(TabModelBase):
         
         # Controls for sending the wave to FUNWAVE
         l = self.rhs_buttons.layout()
+        wave_selection = qw.QHBoxLayout()
+        selection_widget = qw.QWidget()
+        selection_widget.setLayout(wave_selection)
+        l.addWidget(selection_widget)
+        
         self.final_wave = qw.QRadioButton('Final Wave')
         self.final_wave.setChecked(True)
-        l.addWidget(self.final_wave)
+        wave_selection.addWidget(self.final_wave)
+
 
         current_wave = qw.QRadioButton('Current Wave')
-        l.addWidget(current_wave)
+        wave_selection.addWidget(current_wave)
         
         button = qw.QPushButton('Send wave to FUNWAVE')
         button.clicked.connect(self.send_wave_to_funwave)
