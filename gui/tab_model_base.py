@@ -68,16 +68,28 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
  
         self.addWidget(self.config_input_scroller)
         self.addWidget(viewer)   
-        self.addWidget(self.console)        
-        
-        
-        steppersplit = qw.QVBoxLayout()
-        plot_buttons = qw.QWidget()
+        self.addWidget(self.console)                
+
         self.timestepper = DoubleSlider(orientation=Qt.Horizontal)
         self.timestepper.setTickPosition(qw.QSlider.TicksBelow)
         self.timestepper.valueChanged.connect(self.timestep_changed)
-        steppersplit.addWidget(self.timestepper)
+        
+        refresh_results = qw.QPushButton('Refresh results')
+        refresh_results.clicked.connect(self.load_results)
+        
+        stepper_layout = qw.QHBoxLayout()
+        stepper_layout.addWidget(self.timestepper)
+        stepper_layout.addWidget(refresh_results)
+        
+        stepper_container = qw.QWidget()
+        stepper_container.setLayout(stepper_layout)
+        plot_buttons = qw.QWidget()        
+        
+        steppersplit = qw.QVBoxLayout()
+        steppersplit.addWidget(stepper_container)
         steppersplit.addWidget(plot_buttons)        
+        
+                
         plot_controls.setLayout(steppersplit)
         self.plot_options = InputGroup(self, 'Plot options', main_layout=False)
         self.display_bathymetry = self.plot_options.add_input('Bathymetry',
