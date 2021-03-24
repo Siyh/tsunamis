@@ -73,7 +73,7 @@ class TabNHWAVE(TabModelBase):
         g.add_input('dispersion correction in non-hydrostatic model', 'DISP_CORR_SLD', True)
         g.add_input('reduced gravitation in non-hydrostatic model', 'REDU_GRAV_SLD', True)
         g.add_input('non-hydrostatic from upper layer', 'NON_HYDRO_UP', True)
-        g.add_input('minimum slide thickness', 'SLIDE_MINTHICK', 1E-4)
+        g.add_input('minimum slide thickness', 'SLIDE_MINTHICK', 0.1)
         g.add_input('initial velocity of slide in x', 'SLIDE_INIU', 0.0)
         g.add_input('initial velocity of slide in y', 'SLIDE_INIV', 0.0)
         g.add_input('initial velocity of slide in z', 'SLIDE_INIW', 0.0)
@@ -108,7 +108,7 @@ class TabNHWAVE(TabModelBase):
             g.add_input(f'Sponge {d.lower()} width',
                         f'Sponge_{d}_Width', 0.0)           
         g.add_input('Maximum iterations', 'ITMAX', 1000)
-        g.add_input('Tolerance', 'TOL', 1E-8)
+        g.add_input('Tolerance', 'TOL', 1E-12)
         
         g = InputGroup(self, 'Wind', dropdown=True)
         g.add_input('Wind speed', 'Iws', ['constant', 'variable'])
@@ -160,9 +160,9 @@ class TabNHWAVE(TabModelBase):
                     ['Modified Incomplete Cholesky CG',
                      'Incomplete Cholesky GMRES',
                      'Successive Overrelaxation (SOR) GMRES'],
-                    default=1)
+                    default=2)
         g.add_input('Maximum iterations', 'ITMAX', 1000)
-        g.add_input('Tolerance', 'TOL', 1E-8)        
+        g.add_input('Tolerance', 'TOL', 1E-8, scientific=True)        
         
         g = InputGroup(self, 'Wavemaker', dropdown=True)
         g.add_input('Wave type', 'WAVEMAKER', {'None':'NONE'})
@@ -238,7 +238,7 @@ class TabNHWAVE(TabModelBase):
         g.add_input('sediment concentration', 'OUT_F', False)
         g.add_input('bed elevation', 'OUT_G', False)
         g.add_input('salinity', 'OUT_I', False)
-        g.add_input('varying bathymetry', 'OUT_Z', False)
+        g.add_input('varying bathymetry', 'OUT_Z', True)
         g.add_input('max wave height', 'OUT_M', True,
                     function=self.display_wave_max.setEnabled)
         
@@ -270,6 +270,9 @@ class TabNHWAVE(TabModelBase):
         button = qw.QPushButton('Send wave to FUNWAVE')
         button.clicked.connect(self.send_wave_to_funwave)
         l.addWidget(button)
+        
+        
+        self.fps = 5
         
     
                 
@@ -310,8 +313,10 @@ class TabNHWAVE(TabModelBase):
         if value is None: value = self.display_landslide.value()
         if value:
             depth = self.results['depth'][self.timestep]
+                        
             # None test is necessary cos - won't work on depth
             if depth is not None:
+                
                 self.plot.show_landslide(self.mask_above_ground(-depth))
         else:
             self.plot.hide_landslide()
@@ -342,14 +347,13 @@ class TabNHWAVE(TabModelBase):
             vol_str = str(sigfigs(vol_est)) + ' m\u00b3'
             
         self.landslide_volume.setText(vol_str)
-        self.refresh_plots()
         
         
     def output_landslide(self):
         path = os.path.join(self.model_folder.value(), 'SlideThickness.txt')
-        self.status('Landslide thickness exported to ' + path)
+        self.parent.status('Landslide thickness exported to ' + path)
         blob = self.generate_landslide_blob()
-        np.savetxt(path, blob)
+        np.savetxt(path, blob, fmt='%5.1f')
         
         
     def generate_landslide_blob(self):

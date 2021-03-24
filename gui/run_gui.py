@@ -7,7 +7,7 @@ from PyQt5 import QtWidgets as qw
 from main_window import TsunamiWindow
     
     
-def run(config=r'C:\Users\Simon\Desktop\tsunami test 3\config.tsu'):
+def run(config=r'C:\Users\Simon\OneDrive\Documents\PostPostdoc\test1\config.tsu'):
     
     # Written as a function to prevent things from getting into the console
     # namespace, as Spyder also runs in PyQt5   

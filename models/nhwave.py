@@ -137,6 +137,8 @@ class config(model):
                 Defaults to the maximum number.
         method = method of interpolation (see scipy griddata).
         """
+
+
         #Get the number (with preceeding zeros) of the result to convert
         if result_to_convert is None:
             #List of the results
@@ -215,10 +217,13 @@ class config(model):
                 #Make cartesian grid of nhwave files
                 xc, yc = np.meshgrid(sequence(nx0, ndx, nmglob),
                                      sequence(ny0, ndy, nnglob))
-                #Transform points to funwave crs
-                transformed = funw_crs.transform_points(nhw_crs, xc, yc)
-                xs = transformed[:, :, 0].flatten()
-                ys = transformed[:, :, 1].flatten()
+                if nhw_crs == funw_crs:
+                    xs, ys = xc.flatten(), yc.flatten()
+                else:                    
+                    #Transform points to funwave crs
+                    transformed = funw_crs.transform_points(nhw_crs, xc, yc)
+                    xs = transformed[:, :, 0].flatten()
+                    ys = transformed[:, :, 1].flatten()
             
         
         #For each grid to be copied
@@ -241,7 +246,9 @@ class config(model):
                 nzs[indices] = zs.flatten()
                 zs = nzs                
             elif interpolate:
-                #nan to num to convert points outside the funwave area,                
+                # from scipy.interpolate import Rbf
+                # rbfi = Rbf(xs, ys, zs.flatten(), function=method)
+                # zs = rbfi(xl[None,:], yl[:,None])
                 zs = np.nan_to_num(griddata((xs, ys), zs.flatten(),
                                             (xl[None,:], yl[:,None]),
                                             method=method))

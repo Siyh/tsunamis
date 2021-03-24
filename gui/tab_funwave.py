@@ -92,6 +92,8 @@ class TabFUNWAVE(TabModelBase):
         
         self.initial_wave_folder = None
         
+        self.fps = 10
+        
         
     def load_directory_extras(self):
         # Load the initial changes

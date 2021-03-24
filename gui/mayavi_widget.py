@@ -194,7 +194,8 @@ class MayaviQWidget(QtGui.QWidget):
             
 
     def hide_landslide(self):
-        self.landslide.visible = False
+        if self.landslide:
+            self.landslide.visible = False
             
         
     def show_plot(self, plot, zs, colormap, label):  

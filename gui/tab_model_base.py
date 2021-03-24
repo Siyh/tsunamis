@@ -17,6 +17,7 @@ from mayavi_widget import MayaviQWidget, mlab
 from common import WidgetMethods, build_wms_url, DoubleSlider, InputGroup
 from tsunamis.utilities.io import read_configuration_file, read_grid
 
+from cv2 import VideoWriter, VideoWriter_fourcc, destroyAllWindows
 
 
 
@@ -108,17 +109,24 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.play_pause_button = qw.QPushButton() 
         self.playing = False
         self.set_button_icon(self.play_pause_button, 'SP_MediaPlay')
+        self.play_pause_button.clicked.connect(self.play_pause_clicked)
+        
         next_step = qw.QPushButton() 
         self.set_button_icon(next_step, 'SP_MediaSeekForward')
+        next_step.clicked.connect(self.next_timestep)
+        
         previous_step = qw.QPushButton() 
         self.set_button_icon(previous_step, 'SP_MediaSeekBackward')
+        previous_step.clicked.connect(self.previous_timestep)
+        
         restart = qw.QPushButton() 
         self.set_button_icon(restart, 'SP_MediaSkipBackward')
-        
-        self.play_pause_button.clicked.connect(self.play_pause_clicked)
-        next_step.clicked.connect(self.next_timestep)
-        previous_step.clicked.connect(self.previous_timestep)
         restart.clicked.connect(self.restart_timestepper)
+        
+        self.record_button = qw.QPushButton('\u25CF') 
+        self.recording = False
+        self.record_button.clicked.connect(self.record_button_clicked)  
+        
         
         stepper_buttons = qw.QHBoxLayout()
         stepper_buttons.setAlignment(Qt.AlignRight)
@@ -126,6 +134,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         stepper_buttons.addWidget(previous_step)
         stepper_buttons.addWidget(next_step)
         stepper_buttons.addWidget(self.play_pause_button)
+        stepper_buttons.addWidget(self.record_button)
         
         display_options = InputGroup(self, 'Display options', main_layout=False)        
         display_options.addLayout(stepper_buttons)        
@@ -207,8 +216,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.recalculate_timesteps()
         
         g.add_input('Screen output interval', 'SCREEN_INTV', 10.0)
-        g.add_input('Initial timestep size', 'DT_INI', 2.0)
-        g.add_input('Minimium timestep', 'DT_MIN', 0.01)
+        g.add_input('Initial timestep size', 'DT_INI', 2.0, scientific=True)
+        g.add_input('Minimium timestep', 'DT_MIN', 0.01, scientific=True)
         g.add_input('Maximum timestep', 'DT_MAX', 10.0)
         # TODO implement hotstarting
         g.add_input('Hotstart', 'HOTSTART', False, enabled=False)
@@ -244,6 +253,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.refresh_functions = [self.display_wave_height_changed,
                                   self.display_wave_max_changed,
                                   self.display_wave_vectors_changed]
+        
+        
                     
         
     def refresh_plots(self):
@@ -292,6 +303,10 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
     def mask_above_ground(self, zs):   
         # TODO make the masking happen when the results are loaded
         if zs is None:
+            return None
+        
+        # TODO why does this happen?
+        if self.zs.shape != zs.shape:
             return None
             
         zs = zs.copy()         
@@ -376,6 +391,9 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
     
     def next_timestep(self):
         self.timestepper.setIndex(self.timestepper.index + 1)
+        if self.recording:
+            #Reverse index as video requires bgr for some reason
+            self.video.write(mlab.screenshot(figure=self.plot.figure)[:, :, ::-1]) 
         
         
     def previous_timestep(self):
@@ -384,6 +402,32 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         
     def restart_timestepper(self):
         self.timestepper.setValue(0)
+        
+        
+    def record_button_clicked(self):
+        self.recording = not self.recording
+        
+        if self.recording:
+            print('Recording video...')
+            #Setup to grab frame on tstep change
+            path = self.model_folder.value() + 'video.mp4'
+            fourcc = VideoWriter_fourcc(*'mp4v') # Be sure to use lower case
+            self.video = VideoWriter(path, fourcc,
+                    self.fps, self.plot.visualization.scene.get_size())
+            
+            self.record_button.setStyleSheet('color:red')
+
+        else:
+            ###### check video has some length?
+            ###### Why is this needed.
+            self.video.write(mlab.screenshot(figure=self.plot.figure)[:, :, ::-1])  
+            print('Saving video.')
+            #Save video
+            destroyAllWindows()
+            self.video.release()
+            
+            self.record_button.setStyleSheet('color:black')
+            
         
         
     def make_grid_coords(self):
@@ -586,8 +630,8 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
             
         else:
             self.show_console()
-            self.console.setText(self.model.model + ' initialising...\n')            
-            
+            self.console.setText(self.model.model + ' initialising...\n')      
+                        
             # Ouputs inputs
             self.write_model_inputs()
             
@@ -601,6 +645,9 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
         self.set_model_inputs()        
         # Output them
         self.model.write_config()
+        
+        if self.model.model == 'nhwave':
+            self.output_landslide()
         
         self.parent.status(self.model.model + ' inputs written to '
                            + self.model.output_directory)
@@ -672,6 +719,7 @@ class TabModelBase(qw.QSplitter, WidgetMethods):
 
         # Refresh any plots that are showing
         self.refresh_plots()
+        
         
     
     def estimate_vector_exaggeration(self):

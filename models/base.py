@@ -107,7 +107,7 @@ class model:
     def write_config(self, output_directory=''):
         if not output_directory: output_directory = self.output_directory
         
-        print('Writing {} inputs to {}'.format(self.model, output_directory))
+        print(f'Writing {self.model} inputs to {output_directory}')
         
         self.write_inputs()
         self.write_depth()      
@@ -137,6 +137,8 @@ class model:
             for k, v in self.parameters.items():
                 if isinstance(v, bool):
                     v = 'T' if v else 'F'
+                elif isinstance(v, float):
+                    v = f'{v:.3E}'
                 f.write(f'{k} = {v}\n') 
                 
       
@@ -147,8 +149,7 @@ class model:
         np.savetxt(path, self.depth, fmt='%5.1f')
         
         
-    def run(self,
-            console_text_target=None):
+    def run(self, console_text_target=None):
         """
         Run the simulation with the given inputs.
         """
